@@ -32,6 +32,12 @@ const impactTone = {
   Negative: "bg-rose-100 text-rose-800 border-rose-200"
 };
 
+const reliabilityTone = {
+  High: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  Medium: "bg-blue-100 text-blue-800 border-blue-200",
+  Low: "bg-slate-100 text-slate-700 border-slate-200"
+};
+
 export function EvidenceTimeline({ events }: EvidenceTimelineProps) {
   return (
     <section className="glass-panel rounded-2xl p-5 sm:p-6">
@@ -96,6 +102,11 @@ export function EvidenceTimeline({ events }: EvidenceTimelineProps) {
                   </span>
                   <span className="rounded-full border border-white/70 bg-white/58 px-2.5 py-1 text-xs font-medium text-[#596662]">
                     Signal score {event.signalScore}
+                  </span>
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-xs font-medium ${reliabilityTone[event.sourceReliability]}`}
+                  >
+                    Reliability: {event.sourceReliability}
                   </span>
                 </div>
               </div>

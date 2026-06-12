@@ -1,4 +1,4 @@
-import type { NewsArticle, ProviderUsed } from "@/types/esg";
+import type { NewsArticle, ProviderUsed, SourceReliability } from "@/types/esg";
 
 type GdeltArticle = {
   title?: string;
@@ -97,6 +97,42 @@ function dedupeArticles(articles: NewsArticle[]) {
   });
 }
 
+function getSourceReliability(source: string): SourceReliability {
+  const normalisedSource = source.toLowerCase();
+
+  if (
+    normalisedSource.includes("business times") ||
+    normalisedSource.includes("reuters") ||
+    normalisedSource.includes("bloomberg") ||
+    normalisedSource.includes("annual report") ||
+    normalisedSource.includes("sgx") ||
+    normalisedSource.includes("exchange") ||
+    normalisedSource.includes("sembcorp") ||
+    normalisedSource.includes("singtel") ||
+    normalisedSource.includes("dbs") ||
+    normalisedSource.includes("ocbc") ||
+    normalisedSource.includes("uob") ||
+    normalisedSource.includes("keppel") ||
+    normalisedSource.includes("capitaland") ||
+    normalisedSource.includes("wilmar")
+  ) {
+    return "High";
+  }
+
+  if (
+    normalisedSource.includes("sustainability") ||
+    normalisedSource.includes("green") ||
+    normalisedSource.includes("energy") ||
+    normalisedSource.includes("industry") ||
+    normalisedSource.includes("magazine") ||
+    normalisedSource.includes("trade")
+  ) {
+    return "Medium";
+  }
+
+  return "Low";
+}
+
 async function fetchJsonWithTimeout(url: string, timeoutMs: number) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -164,7 +200,8 @@ function mapGdeltArticles(data: GdeltResponse) {
           snippet,
           url: article.url ?? "",
           publishedAt: parseGdeltDate(article.seendate),
-          source
+          source,
+          sourceReliability: getSourceReliability(source)
         };
       })
   );
@@ -208,9 +245,14 @@ export async function fetchGdeltNews(
 function decodeXmlEntities(value: string) {
   return value
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, "\"")
     .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8211;/g, "-")
+    .replace(/&#8212;/g, "-")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
 }
@@ -222,7 +264,18 @@ function textBetween(xml: string, tag: string) {
 }
 
 function stripHtml(value: string) {
-  return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return decodeXmlEntities(value)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanRssText(value: string, source: string) {
+  const withoutTrailingSource = value
+    .replace(new RegExp(`\\s*-\\s*${source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "i"), "")
+    .replace(new RegExp(`\\s+${source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "i"), "");
+
+  return withoutTrailingSource.replace(/\s+/g, " ").trim();
 }
 
 function buildGoogleNewsRssUrl(query: string) {
@@ -243,22 +296,25 @@ function parseGoogleNewsRss(xml: string): NewsArticle[] {
     itemMatches
       .map((match) => {
         const item = match[1];
-        const title = stripHtml(textBetween(item, "title"));
         const url = textBetween(item, "link");
         const pubDate = textBetween(item, "pubDate");
         const source = stripHtml(textBetween(item, "source")) || "Google News RSS";
+        const rawTitle = stripHtml(textBetween(item, "title"));
+        const rawDescription = stripHtml(textBetween(item, "description"));
+        const title = cleanRssText(rawTitle, source);
         const description =
-          stripHtml(textBetween(item, "description")) ||
+          cleanRssText(rawDescription, source) ||
           `Google News RSS article from ${source}.`;
 
         return {
-          title,
+          title: title || rawTitle,
           snippet: description,
           url,
           publishedAt: pubDate
             ? safeDateToIso(pubDate)
             : new Date().toISOString(),
-          source
+          source,
+          sourceReliability: getSourceReliability(source)
         };
       })
       .filter((article) => article.title && article.url)
@@ -341,7 +397,8 @@ export async function fetchNewsApiNews(
         snippet: article.description ?? "Matched ESG news article.",
         url: article.url ?? "",
         publishedAt: article.publishedAt ?? new Date().toISOString(),
-        source: article.source?.name ?? "NewsAPI"
+        source: article.source?.name ?? "NewsAPI",
+        sourceReliability: getSourceReliability(article.source?.name ?? "NewsAPI")
       }))
   );
 }

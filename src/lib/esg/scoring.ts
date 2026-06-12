@@ -74,11 +74,11 @@ function classify(
 function investorActionFor(classification: Classification) {
   switch (classification) {
     case "Early Alpha Opportunity":
-      return "Strong ESG transformation signals are visible while market recognition remains incomplete. This may indicate an early-entry opportunity.";
+      return "Strong ESG transformation signals are emerging while public recognition remains incomplete. This may indicate an early-entry window before broader market pricing.";
     case "Emerging ESG Improver":
       return "ESG transformation signals are developing, but investors should monitor whether momentum strengthens across more sources.";
     case "Already Recognised":
-      return "ESG transformation appears visible, but market recognition is already high. The alpha window may be narrowing.";
+      return "ESG signals are strong, but public recognition is already high. This may be less attractive for early-alpha entry, though still relevant for ESG quality screening.";
     case "Watchlist":
       return "Current live signals are not strong enough for action. Keep on watchlist until stronger ESG evidence emerges.";
   }

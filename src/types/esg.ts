@@ -21,12 +21,15 @@ export type EvidenceSourceType =
 
 export type EvidenceImpact = "Positive" | "Neutral" | "Negative";
 
+export type SourceReliability = "High" | "Medium" | "Low";
+
 export type NewsArticle = {
   title: string;
   snippet: string;
   url: string;
   publishedAt: string;
   source: string;
+  sourceReliability: SourceReliability;
 };
 
 export type ExtractedSignal = {
@@ -40,6 +43,7 @@ export type ExtractedSignal = {
   positiveKeywordCount: number;
   negativeKeywordCount: number;
   source: string;
+  sourceReliability: SourceReliability;
 };
 
 export type EsgScanResult = {

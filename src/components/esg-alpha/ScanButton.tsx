@@ -27,8 +27,9 @@ export function ScanButton({ isScanning, onRunScan }: ScanButtonProps) {
         {isScanning ? "Running ESG Alpha Scan" : "Run Live ESG Alpha Scan"}
       </motion.button>
       <p className="max-w-2xl text-sm leading-6 text-[#596662]">
-        Prototype scan uses live-ready architecture with mock signals in this
-        first build. API integrations will be connected in the next phase.
+        Live scan uses real ESG news signals with fallback protection for demo
+        reliability. Additional sources such as reports, patents, and jobs are
+        modularly connected.
       </p>
     </div>
   );

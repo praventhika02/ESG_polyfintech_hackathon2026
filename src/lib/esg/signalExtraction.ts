@@ -88,7 +88,8 @@ export function extractSignalsFromArticles(articles: NewsArticle[]): ExtractedSi
       signalScore,
       positiveKeywordCount,
       negativeKeywordCount,
-      source: article.source
+      source: article.source,
+      sourceReliability: article.sourceReliability
     };
   });
 }

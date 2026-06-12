@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { CompanySelector } from "@/components/esg-alpha/CompanySelector";
+import { AnnualReportUpload } from "@/components/esg-alpha/AnnualReportUpload";
 import { EvidenceTimeline } from "@/components/esg-alpha/EvidenceTimeline";
 import { HeroSection } from "@/components/esg-alpha/HeroSection";
 import { InvestorActionCard } from "@/components/esg-alpha/InvestorActionCard";
@@ -13,6 +14,18 @@ import { TimeDisplay } from "@/components/esg-alpha/TimeDisplay";
 import { demoCompanies, type CompanyId } from "@/lib/esg/mockCompanies";
 import { mockResults } from "@/lib/esg/mockResults";
 import type { EsgScanResult, EvidenceImpact, EvidenceSourceType } from "@/types/esg";
+
+function investorActionForClassification(classification: string) {
+  if (classification === "Already Recognised") {
+    return "ESG signals are strong, but public recognition is already high. This may be less attractive for early-alpha entry, though still relevant for ESG quality screening.";
+  }
+
+  if (classification === "Early Alpha Opportunity") {
+    return "Strong ESG transformation signals are emerging while public recognition remains incomplete. This may indicate an early-entry window before broader market pricing.";
+  }
+
+  return null;
+}
 
 function normaliseSourceType(sourceType: string): EvidenceSourceType {
   if (sourceType === "Report") {
@@ -55,7 +68,9 @@ function demoFallbackResult(companyId: CompanyId, companyName: string): EsgScanR
     confidence: fallback.confidence,
     alphaWindowMonths: fallback.alphaWindowMonths,
     classification: fallback.classification,
-    investorAction: fallback.investorAction,
+    investorAction:
+      investorActionForClassification(fallback.classification) ??
+      fallback.investorAction,
     whyNow: fallback.whyNow,
     evidenceTimeline: fallback.evidenceTimeline.map((event, index) => ({
       date: event.date,
@@ -67,7 +82,8 @@ function demoFallbackResult(companyId: CompanyId, companyName: string): EsgScanR
       signalScore: Math.max(12, fallback.transformationStrength - 55 - index * 2),
       positiveKeywordCount: 1,
       negativeKeywordCount: 0,
-      source: "Demo fallback"
+      source: "Demo fallback",
+      sourceReliability: "Medium"
     })),
     articlesFound: 0,
     queryUsed: "Client fallback",
@@ -81,6 +97,7 @@ export default function Home() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<CompanyId>("sembcorp");
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<EsgScanResult | null>(null);
+  const [reportFileName, setReportFileName] = useState<string | null>(null);
 
   const selectedCompany = useMemo(
     () =>
@@ -115,7 +132,8 @@ export default function Home() {
         },
         body: JSON.stringify({
           companyId: selectedCompany.id,
-          companyName: selectedCompany.name
+          companyName: selectedCompany.name,
+          reportFileName: reportFileName ?? undefined
         }),
         signal: controller.signal
       });
@@ -147,6 +165,11 @@ export default function Home() {
           companies={demoCompanies}
           selectedCompanyId={selectedCompany.id}
           onSelect={handleSelect}
+        />
+
+        <AnnualReportUpload
+          fileName={reportFileName}
+          onFileNameChange={setReportFileName}
         />
 
         <section className="glass-panel rounded-2xl p-5 sm:p-6">

@@ -8,7 +8,20 @@ import type { EsgScanResult, EvidenceImpact, EvidenceSourceType } from "@/types/
 type ScanRequest = {
   companyId?: string;
   companyName?: string;
+  reportFileName?: string;
 };
+
+function investorActionForClassification(classification: string) {
+  if (classification === "Already Recognised") {
+    return "ESG signals are strong, but public recognition is already high. This may be less attractive for early-alpha entry, though still relevant for ESG quality screening.";
+  }
+
+  if (classification === "Early Alpha Opportunity") {
+    return "Strong ESG transformation signals are emerging while public recognition remains incomplete. This may indicate an early-entry window before broader market pricing.";
+  }
+
+  return null;
+}
 
 function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -80,7 +93,9 @@ function fallbackResult(
     confidence: fallback.confidence,
     alphaWindowMonths: fallback.alphaWindowMonths,
     classification: fallback.classification,
-    investorAction: fallback.investorAction,
+    investorAction:
+      investorActionForClassification(fallback.classification) ??
+      fallback.investorAction,
     whyNow: fallback.whyNow,
     evidenceTimeline: fallback.evidenceTimeline.map((event, index) => ({
       date: event.date,
@@ -92,11 +107,42 @@ function fallbackResult(
       signalScore: Math.max(12, fallback.transformationStrength - 55 - index * 2),
       positiveKeywordCount: 1,
       negativeKeywordCount: 0,
-      source: "Demo fallback"
+      source: "Demo fallback",
+      sourceReliability: "Medium"
     })),
     articlesFound: debug?.articlesFound ?? 0,
     queryUsed: debug?.queryUsed ?? "Demo fallback",
     providerUsed: debug?.providerUsed ?? "fallback"
+  };
+}
+
+function withUploadedReportSignal(
+  result: EsgScanResult,
+  reportFileName?: string
+): EsgScanResult {
+  if (!reportFileName) {
+    return result;
+  }
+
+  return {
+    ...result,
+    evidenceTimeline: [
+      {
+        date: "Uploaded",
+        sourceType: "Reports",
+        title: "Uploaded report included in scan",
+        summary:
+          "The uploaded report will be parsed for ESG commitments in the next module.",
+        url: "",
+        impact: "Neutral",
+        signalScore: 5,
+        positiveKeywordCount: 0,
+        negativeKeywordCount: 0,
+        source: reportFileName,
+        sourceReliability: "High"
+      },
+      ...result.evidenceTimeline
+    ]
   };
 }
 
@@ -108,6 +154,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as ScanRequest;
     const companyId = body.companyId?.trim();
     const companyName = body.companyName?.trim();
+    const reportFileName = body.reportFileName?.trim();
 
     if (!companyId || !companyName) {
       return NextResponse.json(
@@ -135,7 +182,7 @@ export async function POST(request: Request) {
         evidenceCount: fallback.evidenceTimeline.length
       });
 
-      return NextResponse.json(fallback);
+      return NextResponse.json(withUploadedReportSignal(fallback, reportFileName));
     }
 
     const signals = extractSignalsFromArticles(liveNews.articles);
@@ -148,13 +195,17 @@ export async function POST(request: Request) {
     liveResult.articlesFound = liveNews.articlesFound;
     liveResult.queryUsed = liveNews.queryUsed;
     liveResult.providerUsed = liveNews.providerUsed;
+    liveResult.investorAction =
+      investorActionForClassification(liveResult.classification) ??
+      liveResult.investorAction;
+    const responseResult = withUploadedReportSignal(liveResult, reportFileName);
 
     console.log("[API] Returning response", {
-      dataMode: liveResult.dataMode,
-      evidenceCount: liveResult.evidenceTimeline.length
+      dataMode: responseResult.dataMode,
+      evidenceCount: responseResult.evidenceTimeline.length
     });
 
-    return NextResponse.json(liveResult);
+    return NextResponse.json(responseResult);
   } catch (error) {
     console.error("ESG scan route failed", error);
     const fallback = fallbackResult(requestedCompanyId, requestedCompanyName);
