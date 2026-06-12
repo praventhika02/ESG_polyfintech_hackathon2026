@@ -10,7 +10,7 @@ import { InvestorActionCard } from "@/components/esg-alpha/InvestorActionCard";
 import { ResultSummary } from "@/components/esg-alpha/ResultSummary";
 import { ScanButton } from "@/components/esg-alpha/ScanButton";
 import { ScanningPanel } from "@/components/esg-alpha/ScanningPanel";
-import { TimeDisplay } from "@/components/esg-alpha/TimeDisplay";
+import { SignalSourcePanel } from "@/components/esg-alpha/SignalSourcePanel";
 import { demoCompanies, type CompanyId } from "@/lib/esg/mockCompanies";
 import { mockResults } from "@/lib/esg/mockResults";
 import type { EsgScanResult, EvidenceImpact, EvidenceSourceType } from "@/types/esg";
@@ -193,66 +193,15 @@ export default function Home() {
               transition={{ duration: 0.25 }}
             >
               <ResultSummary company={selectedCompany} result={scanResult} />
-              {process.env.NODE_ENV === "development" ? (
-                <section className="glass-panel rounded-2xl p-4">
-                  <div className="grid gap-3 text-sm text-[#42534d] sm:grid-cols-2 lg:grid-cols-7">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900/60">
-                        providerUsed
-                      </p>
-                      <p className="mt-1 font-mono">
-                        {scanResult.providerUsed ?? "fallback"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900/60">
-                        dataMode
-                      </p>
-                      <p className="mt-1 font-mono">{scanResult.dataMode}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900/60">
-                        articlesFound
-                      </p>
-                      <p className="mt-1 font-mono">
-                        {scanResult.articlesFound ?? 0}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900/60">
-                        patentSignalsFound
-                      </p>
-                      <p className="mt-1 font-mono">
-                        {scanResult.patentSignalsFound ?? 0}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900/60">
-                        reportSignalIncluded
-                      </p>
-                      <p className="mt-1 font-mono">
-                        {scanResult.reportSignalIncluded ? "true" : "false"}
-                      </p>
-                    </div>
-                    <div className="sm:col-span-1">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900/60">
-                        queryUsed
-                      </p>
-                      <p className="mt-1 truncate font-mono" title={scanResult.queryUsed}>
-                        {scanResult.queryUsed ?? "n/a"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900/60">
-                        generatedAt
-                      </p>
-                      <p className="mt-1 font-mono">
-                        <TimeDisplay value={scanResult.generatedAt} />
-                      </p>
-                    </div>
-                  </div>
-                </section>
-              ) : null}
+              <SignalSourcePanel
+                providerUsed={scanResult.providerUsed}
+                dataMode={scanResult.dataMode}
+                articlesFound={scanResult.articlesFound}
+                patentSignalsFound={scanResult.patentSignalsFound}
+                reportSignalIncluded={scanResult.reportSignalIncluded}
+                queryUsed={scanResult.queryUsed}
+                generatedAt={scanResult.generatedAt}
+              />
               <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
                 <InvestorActionCard result={scanResult} />
                 <EvidenceTimeline events={scanResult.evidenceTimeline} />
