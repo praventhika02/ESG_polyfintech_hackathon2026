@@ -9,6 +9,7 @@ import { InvestorActionCard } from "@/components/esg-alpha/InvestorActionCard";
 import { ResultSummary } from "@/components/esg-alpha/ResultSummary";
 import { ScanButton } from "@/components/esg-alpha/ScanButton";
 import { ScanningPanel } from "@/components/esg-alpha/ScanningPanel";
+import { TimeDisplay } from "@/components/esg-alpha/TimeDisplay";
 import { mockCompanies, type CompanyId } from "@/lib/esg/mockCompanies";
 import { mockResults } from "@/lib/esg/mockResults";
 import type { EsgScanResult, EvidenceImpact, EvidenceSourceType } from "@/types/esg";
@@ -67,23 +68,17 @@ function demoFallbackResult(companyId: CompanyId, companyName: string): EsgScanR
       positiveKeywordCount: 1,
       negativeKeywordCount: 0,
       source: "Demo fallback"
-    }))
+    })),
+    articlesFound: 0,
+    queryUsed: "Client fallback",
+    providerUsed: "fallback"
   };
-}
-
-function wait(milliseconds: number) {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, milliseconds);
-  });
 }
 
 export default function Home() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<CompanyId>("sembcorp");
   const [isScanning, setIsScanning] = useState(false);
-  const [hasResult, setHasResult] = useState(true);
-  const [scanResult, setScanResult] = useState<EsgScanResult>(() =>
-    demoFallbackResult("sembcorp", "Sembcorp Industries")
-  );
+  const [scanResult, setScanResult] = useState<EsgScanResult | null>(null);
 
   const selectedCompany = useMemo(
     () =>
@@ -94,40 +89,50 @@ export default function Home() {
 
   function handleSelect(companyId: CompanyId) {
     setSelectedCompanyId(companyId);
-    setHasResult(false);
+    setScanResult(null);
   }
 
   async function handleRunScan() {
+    if (!selectedCompany) {
+      return;
+    }
+
+    console.log("[Scan UI] Starting scan", selectedCompany.name);
     setIsScanning(true);
-    setHasResult(false);
+    setScanResult(null);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      controller.abort();
+    }, 15000);
 
     try {
-      const [response] = await Promise.all([
-        fetch("/api/esg/scan", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            companyId: selectedCompany.id,
-            companyName: selectedCompany.name
-          })
+      const response = await fetch("/api/esg/scan", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          companyId: selectedCompany.id,
+          companyName: selectedCompany.name
         }),
-        wait(1800)
-      ]);
+        signal: controller.signal
+      });
 
       if (!response.ok) {
-        throw new Error(`Scan request failed with ${response.status}`);
+        throw new Error(`Scan failed: ${response.status}`);
       }
 
-      const result = (await response.json()) as EsgScanResult;
-      setScanResult(result);
+      const data = (await response.json()) as EsgScanResult;
+
+      console.log("[Scan UI] Received scan result", data);
+      setScanResult(data);
     } catch (error) {
-      console.error("Client ESG scan failed", error);
+      console.error("[Scan UI] Scan failed:", error);
       setScanResult(demoFallbackResult(selectedCompany.id, selectedCompany.name));
     } finally {
+      window.clearTimeout(timeout);
       setIsScanning(false);
-      setHasResult(true);
+      console.log("[Scan UI] Scan finished");
     }
   }
 
@@ -149,7 +154,7 @@ export default function Home() {
         <AnimatePresence mode="wait">
           {isScanning ? (
             <ScanningPanel key="scan" company={selectedCompany} />
-          ) : hasResult ? (
+          ) : scanResult ? (
             <motion.div
               key={selectedCompany.id}
               className="grid gap-5 sm:gap-6"
@@ -161,7 +166,15 @@ export default function Home() {
               <ResultSummary company={selectedCompany} result={scanResult} />
               {process.env.NODE_ENV === "development" ? (
                 <section className="glass-panel rounded-2xl p-4">
-                  <div className="grid gap-3 text-sm text-[#42534d] sm:grid-cols-4">
+                  <div className="grid gap-3 text-sm text-[#42534d] sm:grid-cols-5">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900/60">
+                        providerUsed
+                      </p>
+                      <p className="mt-1 font-mono">
+                        {scanResult.providerUsed ?? "fallback"}
+                      </p>
+                    </div>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900/60">
                         dataMode
@@ -189,7 +202,7 @@ export default function Home() {
                         generatedAt
                       </p>
                       <p className="mt-1 font-mono">
-                        {new Date(scanResult.generatedAt).toLocaleTimeString()}
+                        <TimeDisplay value={scanResult.generatedAt} />
                       </p>
                     </div>
                   </div>

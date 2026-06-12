@@ -1,4 +1,4 @@
-import type { NewsArticle } from "@/types/esg";
+import type { NewsArticle, ProviderUsed } from "@/types/esg";
 
 type GdeltArticle = {
   title?: string;
@@ -34,12 +34,24 @@ export type LiveNewsResult = {
   articles: NewsArticle[];
   articlesFound: number;
   queryUsed: string;
+  providerUsed: ProviderUsed;
+};
+
+const primaryCompanyQueries: Record<string, string> = {
+  "DBS Group Holdings": "DBS Singapore sustainability",
+  OCBC: "OCBC sustainability",
+  UOB: "UOB Singapore sustainability",
+  Singtel: "Singtel sustainability",
+  "Keppel Ltd": "Keppel sustainability",
+  "CapitaLand Investment": "CapitaLand sustainability",
+  "Wilmar International": "Wilmar sustainability",
+  "Sembcorp Industries": "Sembcorp renewable energy"
 };
 
 const companyAliases: Record<string, string> = {
   "DBS Group Holdings": "DBS",
-  OCBC: "OCBC Bank",
-  UOB: "UOB Bank",
+  OCBC: "OCBC",
+  UOB: "UOB",
   Singtel: "Singtel",
   "Keppel Ltd": "Keppel",
   "CapitaLand Investment": "CapitaLand",
@@ -48,20 +60,11 @@ const companyAliases: Record<string, string> = {
 };
 
 function buildGdeltQueries(companyName: string) {
-  const alias = companyAliases[companyName];
-  const quotedCompany = `"${companyName}"`;
-  const queries = [
-    `${quotedCompany} sustainability`,
-    `${quotedCompany} ESG`,
-    `${quotedCompany} renewable`,
-    quotedCompany
-  ];
+  const alias = companyAliases[companyName] ?? companyName;
+  const primaryQuery = primaryCompanyQueries[companyName] ?? `${alias} sustainability`;
+  const queries = [primaryQuery, `${alias} ESG`, alias];
 
-  if (alias && alias !== companyName) {
-    queries.push(alias);
-  }
-
-  return queries;
+  return queries.slice(0, 3);
 }
 
 function parseGdeltDate(seenDate?: string) {
@@ -94,12 +97,6 @@ function dedupeArticles(articles: NewsArticle[]) {
   });
 }
 
-function wait(milliseconds: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, milliseconds);
-  });
-}
-
 async function fetchJsonWithTimeout(url: string, timeoutMs: number) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -107,7 +104,11 @@ async function fetchJsonWithTimeout(url: string, timeoutMs: number) {
   try {
     const response = await fetch(url, {
       cache: "no-store",
-      signal: controller.signal
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 ESG-Alpha-Gap-Hackathon",
+        Accept: "application/json"
+      }
     });
 
     if (!response.ok) {
@@ -118,6 +119,28 @@ async function fetchJsonWithTimeout(url: string, timeoutMs: number) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export function buildGdeltUrl(query: string) {
+  const params = new URLSearchParams({
+    query,
+    mode: "ArtList",
+    format: "json",
+    maxrecords: "10",
+    sort: "HybridRel"
+  });
+
+  return `https://api.gdeltproject.org/api/v2/doc/doc?${params.toString()}`;
+}
+
+export async function fetchRawGdeltArticles(query: string) {
+  const url = buildGdeltUrl(query);
+  const data = await fetchJsonWithTimeout(url, 10000);
+
+  return {
+    url,
+    articles: data.articles ?? []
+  };
 }
 
 function mapGdeltArticles(data: GdeltResponse) {
@@ -152,21 +175,11 @@ export async function fetchGdeltNews(
 ): Promise<LiveNewsResult> {
   const queries = buildGdeltQueries(companyName);
 
-  for (const [index, query] of queries.entries()) {
+  for (const query of queries) {
     console.log("[GDELT] Trying query:", query);
 
     try {
-      const params = new URLSearchParams({
-        query,
-        mode: "ArtList",
-        format: "json",
-        maxrecords: "20",
-        sort: "HybridRel"
-      });
-      const data = await fetchJsonWithTimeout(
-        `https://api.gdeltproject.org/api/v2/doc/doc?${params.toString()}`,
-        8000
-      );
+      const data = await fetchJsonWithTimeout(buildGdeltUrl(query), 2500);
       const articles = mapGdeltArticles(data);
 
       console.log("[GDELT] Articles found:", articles.length);
@@ -175,23 +188,120 @@ export async function fetchGdeltNews(
         return {
           articles,
           articlesFound: articles.length,
-          queryUsed: query
+          queryUsed: query,
+          providerUsed: "gdelt"
         };
       }
     } catch (error) {
       console.error("[GDELT] Query failed:", query, error);
-    }
-
-    if (index < queries.length - 1) {
-      await wait(5200);
     }
   }
 
   return {
     articles: [],
     articlesFound: 0,
-    queryUsed: queries.at(-1) ?? companyName
+    queryUsed: queries.at(-1) ?? companyName,
+    providerUsed: "fallback"
   };
+}
+
+function decodeXmlEntities(value: string) {
+  return value
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+function textBetween(xml: string, tag: string) {
+  const match = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
+
+  return match ? decodeXmlEntities(match[1].trim()) : "";
+}
+
+function stripHtml(value: string) {
+  return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function buildGoogleNewsRssUrl(query: string) {
+  const params = new URLSearchParams({
+    q: query,
+    hl: "en-SG",
+    gl: "SG",
+    ceid: "SG:en"
+  });
+
+  return `https://news.google.com/rss/search?${params.toString()}`;
+}
+
+function parseGoogleNewsRss(xml: string): NewsArticle[] {
+  const itemMatches = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)];
+
+  return dedupeArticles(
+    itemMatches
+      .map((match) => {
+        const item = match[1];
+        const title = stripHtml(textBetween(item, "title"));
+        const url = textBetween(item, "link");
+        const pubDate = textBetween(item, "pubDate");
+        const source = stripHtml(textBetween(item, "source")) || "Google News RSS";
+        const description =
+          stripHtml(textBetween(item, "description")) ||
+          `Google News RSS article from ${source}.`;
+
+        return {
+          title,
+          snippet: description,
+          url,
+          publishedAt: pubDate
+            ? safeDateToIso(pubDate)
+            : new Date().toISOString(),
+          source
+        };
+      })
+      .filter((article) => article.title && article.url)
+  );
+}
+
+function safeDateToIso(value: string) {
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+}
+
+export async function fetchGoogleNewsRss(
+  query: string
+): Promise<LiveNewsResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4500);
+
+  try {
+    const response = await fetch(buildGoogleNewsRssUrl(query), {
+      cache: "no-store",
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 ESG-Alpha-Gap-Hackathon",
+        Accept: "application/rss+xml, application/xml, text/xml"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google News RSS request failed with ${response.status}`);
+    }
+
+    const articles = parseGoogleNewsRss(await response.text()).slice(0, 10);
+
+    return {
+      articles,
+      articlesFound: articles.length,
+      queryUsed: query,
+      providerUsed: articles.length > 0 ? "google_news_rss" : "fallback"
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function buildNewsApiQuery(companyName: string) {
@@ -213,7 +323,7 @@ export async function fetchNewsApiNews(
     `https://newsapi.org/v2/everything?${params.toString()}`,
     {
       cache: "no-store",
-      signal: AbortSignal.timeout(8000)
+      signal: AbortSignal.timeout(3500)
     }
   );
 
@@ -245,25 +355,19 @@ export async function fetchLiveEsgNews(
     return gdeltResult;
   }
 
-  const newsApiKey = process.env.NEWS_API_KEY;
-
-  if (!newsApiKey) {
-    return gdeltResult;
-  }
+  const rssQuery =
+    primaryCompanyQueries[companyName] ??
+    `${companyAliases[companyName] ?? companyName} sustainability`;
 
   try {
-    const newsApiArticles = await fetchNewsApiNews(companyName, newsApiKey);
+    const rssResult = await fetchGoogleNewsRss(rssQuery);
 
-    return {
-      articles: newsApiArticles,
-      articlesFound: newsApiArticles.length,
-      queryUsed:
-        newsApiArticles.length > 0
-          ? `NewsAPI: ${buildNewsApiQuery(companyName)}`
-          : gdeltResult.queryUsed
-    };
+    if (rssResult.articles.length > 0) {
+      return rssResult;
+    }
   } catch (error) {
-    console.error("NewsAPI ESG news fetch failed", error);
-    return gdeltResult;
+    console.error("Google News RSS fetch failed", error);
   }
+
+  return gdeltResult;
 }

@@ -8,6 +8,8 @@ export type Classification =
 
 export type DataMode = "live" | "fallback";
 
+export type ProviderUsed = "gdelt" | "google_news_rss" | "fallback";
+
 export type EvidenceSourceType =
   | "News"
   | "Jobs"
@@ -55,4 +57,5 @@ export type EsgScanResult = {
   evidenceTimeline: ExtractedSignal[];
   articlesFound?: number;
   queryUsed?: string;
+  providerUsed?: ProviderUsed;
 };

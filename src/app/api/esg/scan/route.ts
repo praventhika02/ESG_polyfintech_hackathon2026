@@ -10,6 +10,21 @@ type ScanRequest = {
   companyName?: string;
 };
 
+function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error(`Scan timed out after ${milliseconds}ms`));
+    }, milliseconds);
+
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => {
+        clearTimeout(timeout);
+      });
+  });
+}
+
 function impactFromText(text: string): EvidenceImpact {
   const lowered = text.toLowerCase();
 
@@ -49,6 +64,7 @@ function fallbackResult(
   debug?: {
     articlesFound?: number;
     queryUsed?: string;
+    providerUsed?: EsgScanResult["providerUsed"];
   }
 ): EsgScanResult {
   const fallback =
@@ -79,7 +95,8 @@ function fallbackResult(
       source: "Demo fallback"
     })),
     articlesFound: debug?.articlesFound ?? 0,
-    queryUsed: debug?.queryUsed ?? "Demo fallback"
+    queryUsed: debug?.queryUsed ?? "Demo fallback",
+    providerUsed: debug?.providerUsed ?? "fallback"
   };
 }
 
@@ -102,18 +119,23 @@ export async function POST(request: Request) {
     requestedCompanyId = companyId;
     requestedCompanyName = companyName;
 
-    console.log("[ESG Scan] Starting scan for:", companyName);
+    console.log("[API] Scan started", companyName);
 
-    const liveNews = await fetchLiveEsgNews(companyName);
+    const liveNews = await withTimeout(fetchLiveEsgNews(companyName), 14000);
 
     if (liveNews.articles.length === 0) {
-      console.log("[ESG Scan] Data mode:", "fallback");
-      return NextResponse.json(
-        fallbackResult(companyId, companyName, {
-          articlesFound: liveNews.articlesFound,
-          queryUsed: liveNews.queryUsed
-        })
-      );
+      const fallback = fallbackResult(companyId, companyName, {
+        articlesFound: liveNews.articlesFound,
+        queryUsed: liveNews.queryUsed,
+        providerUsed: "fallback"
+      });
+
+      console.log("[API] Returning response", {
+        dataMode: fallback.dataMode,
+        evidenceCount: fallback.evidenceTimeline.length
+      });
+
+      return NextResponse.json(fallback);
     }
 
     const signals = extractSignalsFromArticles(liveNews.articles);
@@ -125,17 +147,23 @@ export async function POST(request: Request) {
 
     liveResult.articlesFound = liveNews.articlesFound;
     liveResult.queryUsed = liveNews.queryUsed;
+    liveResult.providerUsed = liveNews.providerUsed;
 
-    console.log("[ESG Scan] Data mode:", liveResult.dataMode);
+    console.log("[API] Returning response", {
+      dataMode: liveResult.dataMode,
+      evidenceCount: liveResult.evidenceTimeline.length
+    });
 
     return NextResponse.json(liveResult);
   } catch (error) {
     console.error("ESG scan route failed", error);
-    console.log("[ESG Scan] Data mode:", "fallback");
+    const fallback = fallbackResult(requestedCompanyId, requestedCompanyName);
 
-    return NextResponse.json(
-      fallbackResult(requestedCompanyId, requestedCompanyName),
-      { status: 200 }
-    );
+    console.log("[API] Returning response", {
+      dataMode: fallback.dataMode,
+      evidenceCount: fallback.evidenceTimeline.length
+    });
+
+    return NextResponse.json(fallback, { status: 200 });
   }
 }
