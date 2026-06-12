@@ -90,6 +90,7 @@ function demoFallbackResult(companyId: CompanyId, companyName: string): EsgScanR
     articlesFound: 0,
     patentSignalsFound: 0,
     reportSignalIncluded: false,
+    reportSignalsFound: 0,
     queryUsed: "Client fallback",
     providerUsed: "fallback"
   };
@@ -101,7 +102,7 @@ export default function Home() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<CompanyId>("sembcorp");
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<EsgScanResult | null>(null);
-  const [reportFileName, setReportFileName] = useState<string | null>(null);
+  const [reportFileNames, setReportFileNames] = useState<string[]>([]);
 
   const selectedCompany = useMemo(
     () =>
@@ -137,7 +138,7 @@ export default function Home() {
         body: JSON.stringify({
           companyId: selectedCompany.id,
           companyName: selectedCompany.name,
-          reportFileName: reportFileName ?? undefined
+          reportFileNames
         }),
         signal: controller.signal
       });
@@ -172,8 +173,8 @@ export default function Home() {
         />
 
         <AnnualReportUpload
-          fileName={reportFileName}
-          onFileNameChange={setReportFileName}
+          fileNames={reportFileNames}
+          onFileNamesChange={setReportFileNames}
         />
 
         <section className="glass-panel rounded-2xl p-5 sm:p-6">
@@ -199,6 +200,7 @@ export default function Home() {
                 articlesFound={scanResult.articlesFound}
                 patentSignalsFound={scanResult.patentSignalsFound}
                 reportSignalIncluded={scanResult.reportSignalIncluded}
+                reportSignalsFound={scanResult.reportSignalsFound}
                 queryUsed={scanResult.queryUsed}
                 generatedAt={scanResult.generatedAt}
               />

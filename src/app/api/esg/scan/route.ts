@@ -15,6 +15,7 @@ type ScanRequest = {
   companyId?: string;
   companyName?: string;
   reportFileName?: string;
+  reportFileNames?: string[];
 };
 
 function investorActionForClassification(classification: string) {
@@ -121,6 +122,7 @@ function fallbackResult(
     articlesFound: debug?.articlesFound ?? 0,
     patentSignalsFound: 0,
     reportSignalIncluded: false,
+    reportSignalsFound: 0,
     queryUsed: debug?.queryUsed ?? "Demo fallback",
     providerUsed: debug?.providerUsed ?? "fallback"
   };
@@ -204,36 +206,60 @@ function withPatentSignals(
 
 function withUploadedReportSignal(
   result: EsgScanResult,
-  reportFileName?: string
+  reportFileNames: string[]
 ): EsgScanResult {
-  if (!reportFileName) {
+  if (reportFileNames.length === 0) {
     return {
       ...result,
-      reportSignalIncluded: false
+      reportSignalIncluded: false,
+      reportSignalsFound: 0
     };
   }
+
+  const reportEvidence = reportFileNames.slice(0, 3).map((fileName, index) => {
+    const remainingCount = reportFileNames.length - 2;
+    const isSummary = reportFileNames.length > 3 && index === 2;
+
+    return {
+      date: "Uploaded",
+      sourceType: "Reports" as const,
+      title: isSummary
+        ? `+${remainingCount} additional reports included in scan`
+        : `Uploaded report included: ${fileName}`,
+      summary: isSummary
+        ? "Additional uploaded reports have been included as company disclosure signals for ESG transformation review."
+        : "This report has been included as a company disclosure signal for ESG transformation review.",
+      url: "",
+      impact: "Neutral" as const,
+      signalScore: 5,
+      positiveKeywordCount: 0,
+      negativeKeywordCount: 0,
+      source: isSummary ? "Multiple uploaded reports" : fileName,
+      sourceReliability: "High" as const
+    };
+  });
 
   return {
     ...result,
     reportSignalIncluded: true,
-    evidenceTimeline: [
-      {
-        date: "Uploaded",
-        sourceType: "Reports",
-        title: "Uploaded report included in scan",
-        summary:
-          "The uploaded report will be parsed for ESG commitments in the next module.",
-        url: "",
-        impact: "Neutral",
-        signalScore: 5,
-        positiveKeywordCount: 0,
-        negativeKeywordCount: 0,
-        source: reportFileName,
-        sourceReliability: "High"
-      },
-      ...result.evidenceTimeline
-    ]
+    reportSignalsFound: reportFileNames.length,
+    evidenceTimeline: [...reportEvidence, ...result.evidenceTimeline]
   };
+}
+
+function normaliseReportFileNames(body: ScanRequest) {
+  const namesFromArray = Array.isArray(body.reportFileNames)
+    ? body.reportFileNames
+    : [];
+  const legacyName = body.reportFileName ? [body.reportFileName] : [];
+
+  return Array.from(
+    new Set(
+      [...namesFromArray, ...legacyName]
+        .map((fileName) => fileName.trim())
+        .filter(Boolean)
+    )
+  );
 }
 
 export async function POST(request: Request) {
@@ -244,7 +270,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as ScanRequest;
     const companyId = body.companyId?.trim();
     const companyName = body.companyName?.trim();
-    const reportFileName = body.reportFileName?.trim();
+    const reportFileNames = normaliseReportFileNames(body);
 
     if (!companyId || !companyName) {
       return NextResponse.json(
@@ -268,7 +294,7 @@ export async function POST(request: Request) {
 
     const newsCount = liveNews.articles.length;
     const patentCount = patentSignals.length;
-    const hasReportSignal = Boolean(reportFileName);
+    const hasReportSignal = reportFileNames.length > 0;
     const { dataMode, providerUsed } = resolveScanMode({
       newsCount,
       patentCount,
@@ -303,14 +329,15 @@ export async function POST(request: Request) {
       partialResult.articlesFound = liveNews.articlesFound;
       partialResult.patentSignalsFound = patentCount;
       partialResult.reportSignalIncluded = hasReportSignal;
+      partialResult.reportSignalsFound = reportFileNames.length;
       partialResult.queryUsed =
         patentCount > 0
           ? "Google Patents ESG innovation queries"
-          : reportFileName ?? "Uploaded report";
+          : reportFileNames.join(", ") || "Uploaded report";
 
       const responseResult = withUploadedReportSignal(
         withPatentSignals(partialResult, patentSignals),
-        reportFileName
+        reportFileNames
       );
 
       console.log("[API] Returning response", {
@@ -333,6 +360,7 @@ export async function POST(request: Request) {
     liveResult.articlesFound = liveNews.articlesFound;
     liveResult.patentSignalsFound = patentCount;
     liveResult.reportSignalIncluded = hasReportSignal;
+    liveResult.reportSignalsFound = reportFileNames.length;
     liveResult.queryUsed = liveNews.queryUsed;
     liveResult.providerUsed = providerUsed;
     liveResult.investorAction =
@@ -340,7 +368,7 @@ export async function POST(request: Request) {
       liveResult.investorAction;
     const responseResult = withUploadedReportSignal(
       withPatentSignals(liveResult, patentSignals),
-      reportFileName
+      reportFileNames
     );
 
     console.log("[API] Returning response", {

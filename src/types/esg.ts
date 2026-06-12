@@ -70,6 +70,7 @@ export type EsgScanResult = {
   articlesFound?: number;
   patentSignalsFound?: number;
   reportSignalIncluded?: boolean;
+  reportSignalsFound?: number;
   queryUsed?: string;
   providerUsed?: ProviderUsed;
 };

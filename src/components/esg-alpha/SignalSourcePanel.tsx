@@ -17,6 +17,7 @@ type SignalSourcePanelProps = {
   articlesFound?: number;
   patentSignalsFound?: number;
   reportSignalIncluded?: boolean;
+  reportSignalsFound?: number;
   queryUsed?: string;
   generatedAt: string;
 };
@@ -66,11 +67,11 @@ function sourceStatus(active: boolean, activeLabel = "Active", inactiveLabel = "
 function sourceMix({
   articlesFound,
   patentSignalsFound,
-  reportSignalIncluded
+  reportSignalsFound
 }: {
   articlesFound: number;
   patentSignalsFound: number;
-  reportSignalIncluded: boolean;
+  reportSignalsFound: number;
 }) {
   const segments = [
     {
@@ -85,7 +86,7 @@ function sourceMix({
     },
     {
       key: "Report",
-      value: reportSignalIncluded ? 1 : 0,
+      value: reportSignalsFound,
       className: "bg-gradient-to-r from-amber-400 to-yellow-500"
     }
   ].filter((segment) => segment.value > 0);
@@ -109,14 +110,16 @@ export function SignalSourcePanel({
   articlesFound = 0,
   patentSignalsFound = 0,
   reportSignalIncluded = false,
+  reportSignalsFound,
   queryUsed,
   generatedAt
 }: SignalSourcePanelProps) {
+  const reportCount = reportSignalsFound ?? (reportSignalIncluded ? 1 : 0);
   const mode = modeDisplay[dataMode];
   const newsStatus = sourceStatus(articlesFound > 0);
   const patentStatus = sourceStatus(patentSignalsFound > 0);
   const reportStatus = sourceStatus(
-    reportSignalIncluded,
+    reportCount > 0,
     "Included",
     "Optional"
   );
@@ -139,8 +142,8 @@ export function SignalSourcePanel({
     },
     {
       title: "Report Signal",
-      count: reportSignalIncluded ? 1 : 0,
-      label: "Uploaded report signal",
+      count: reportCount,
+      label: "Uploaded report signals",
       icon: FileText,
       status: reportStatus,
       accent: "text-amber-700"
@@ -149,7 +152,7 @@ export function SignalSourcePanel({
   const mixSegments = sourceMix({
     articlesFound,
     patentSignalsFound,
-    reportSignalIncluded
+    reportSignalsFound: reportCount
   });
   const mixTotal = mixSegments.reduce((total, segment) => total + segment.value, 0);
 
@@ -265,6 +268,7 @@ export function SignalSourcePanel({
               <span>
                 reportSignalIncluded: {reportSignalIncluded ? "true" : "false"}
               </span>
+              <span>reportSignalsFound: {reportCount}</span>
               <span className="truncate">queryUsed: {queryUsed ?? "n/a"}</span>
             </div>
           </details>
