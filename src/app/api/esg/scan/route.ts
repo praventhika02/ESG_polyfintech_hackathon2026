@@ -21,11 +21,23 @@ type ScanRequest = {
 
 function investorActionForClassification(classification: string) {
   if (classification === "Already Recognised") {
-    return "ESG signals are strong, but public recognition is already high. This may be less attractive for early-alpha entry, though still relevant for ESG quality screening.";
+    return "ESG signals are strong, but public recognition is already high. The alpha window may be narrowing.";
   }
 
   if (classification === "Early Alpha Opportunity") {
-    return "Strong ESG transformation signals are emerging while public recognition remains incomplete. This may indicate an early-entry window before broader market pricing.";
+    return "Strong transformation evidence is emerging while public recognition remains incomplete. This may indicate an early-entry window.";
+  }
+
+  if (classification === "Emerging ESG Improver") {
+    return "ESG transformation evidence is developing across multiple sources. Continue monitoring for stronger recognition lag.";
+  }
+
+  if (classification === "Innovation Watchlist") {
+    return "Patent and hiring signals suggest early innovation activity, but live news recognition is limited. Monitor for confirmation.";
+  }
+
+  if (classification === "Evidence Watchlist" || classification === "Watchlist") {
+    return "Current evidence is not strong enough for an investor action signal. More signals are needed.";
   }
 
   return null;
@@ -81,6 +93,44 @@ function normaliseSourceType(sourceType: string): EvidenceSourceType {
   return "News";
 }
 
+function fallbackScoreBreakdown(fallback: (typeof mockResults)[keyof typeof mockResults]) {
+  return {
+    transformation: {
+      total: fallback.transformationStrength,
+      newsScore: 0,
+      patentScore: 0,
+      hiringScore: 0,
+      reportScore: 0,
+      diversityBonus: 0,
+      explanation:
+        "Fallback scores use a demo scenario because live evidence sources were unavailable."
+    },
+    confidence: {
+      total: Math.min(76, fallback.confidence),
+      volumeScore: 0,
+      diversityScore: 0,
+      reliabilityScore: 0,
+      reportSupport: 0,
+      consistencyScore: 0,
+      appliedCap:
+        "Capped at 76 because only fallback demo evidence was available.",
+      explanation:
+        "Confidence is limited because this response is not based on live source agreement."
+    },
+    marketRecognition: {
+      level: fallback.marketRecognition,
+      newsArticleCount: 0,
+      explanation:
+        "No live ESG news articles were available, so market recognition is inferred from the demo fallback scenario."
+    },
+    alphaWindow: {
+      months: fallback.alphaWindowMonths,
+      explanation:
+        "The alpha window is illustrative because live evidence sources were unavailable."
+    }
+  };
+}
+
 function fallbackResult(
   companyId: string,
   companyName: string,
@@ -126,7 +176,13 @@ function fallbackResult(
     reportSignalIncluded: false,
     reportSignalsFound: 0,
     queryUsed: debug?.queryUsed ?? "Demo fallback",
-    providerUsed: debug?.providerUsed ?? "fallback"
+    providerUsed: debug?.providerUsed ?? "fallback",
+    scoreBreakdown: fallbackScoreBreakdown(fallback),
+    scoreRationale: [
+      "Live evidence was unavailable, so this response uses demo fallback data.",
+      "Scores are illustrative and should be replaced by live news, patent, hiring, or report signals when available.",
+      "Confidence is capped because source agreement could not be verified."
+    ]
   };
 }
 
@@ -386,6 +442,7 @@ export async function POST(request: Request) {
         companyName,
         patentSignalCount: patentCount,
         jobSignalCount: jobCount,
+        reportSignalCount: reportFileNames.length,
         hasReportSignal
       });
 
@@ -422,6 +479,7 @@ export async function POST(request: Request) {
       signals,
       patentSignalCount: patentCount,
       jobSignalCount: jobCount,
+      reportSignalCount: reportFileNames.length,
       hasAdditionalSource: patentCount > 0 || jobCount > 0 || hasReportSignal
     });
 

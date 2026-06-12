@@ -10,6 +10,7 @@ import { InvestorActionCard } from "@/components/esg-alpha/InvestorActionCard";
 import { ResultSummary } from "@/components/esg-alpha/ResultSummary";
 import { ScanButton } from "@/components/esg-alpha/ScanButton";
 import { ScanningPanel } from "@/components/esg-alpha/ScanningPanel";
+import { ScoreExplanationPanel } from "@/components/esg-alpha/ScoreExplanationPanel";
 import { SignalSourcePanel } from "@/components/esg-alpha/SignalSourcePanel";
 import { demoCompanies, type CompanyId } from "@/lib/esg/mockCompanies";
 import { mockResults } from "@/lib/esg/mockResults";
@@ -17,11 +18,23 @@ import type { EsgScanResult, EvidenceImpact, EvidenceSourceType } from "@/types/
 
 function investorActionForClassification(classification: string) {
   if (classification === "Already Recognised") {
-    return "ESG signals are strong, but public recognition is already high. This may be less attractive for early-alpha entry, though still relevant for ESG quality screening.";
+    return "ESG signals are strong, but public recognition is already high. The alpha window may be narrowing.";
   }
 
   if (classification === "Early Alpha Opportunity") {
-    return "Strong ESG transformation signals are emerging while public recognition remains incomplete. This may indicate an early-entry window before broader market pricing.";
+    return "Strong transformation evidence is emerging while public recognition remains incomplete. This may indicate an early-entry window.";
+  }
+
+  if (classification === "Emerging ESG Improver") {
+    return "ESG transformation evidence is developing across multiple sources. Continue monitoring for stronger recognition lag.";
+  }
+
+  if (classification === "Innovation Watchlist") {
+    return "Patent and hiring signals suggest early innovation activity, but live news recognition is limited. Monitor for confirmation.";
+  }
+
+  if (classification === "Evidence Watchlist" || classification === "Watchlist") {
+    return "Current evidence is not strong enough for an investor action signal. More signals are needed.";
   }
 
   return null;
@@ -206,6 +219,7 @@ export default function Home() {
                 queryUsed={scanResult.queryUsed}
                 generatedAt={scanResult.generatedAt}
               />
+              <ScoreExplanationPanel result={scanResult} />
               <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
                 <InvestorActionCard result={scanResult} />
                 <EvidenceTimeline events={scanResult.evidenceTimeline} />

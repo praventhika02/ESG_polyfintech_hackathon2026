@@ -2,7 +2,9 @@ import type {
   Classification,
   EsgScanResult,
   ExtractedSignal,
-  MarketRecognition
+  MarketRecognition,
+  ScoreBreakdown,
+  SourceReliability
 } from "@/types/esg";
 
 function clamp(value: number, min: number, max: number) {
@@ -21,150 +23,374 @@ function recognitionFromVolume(articleCount: number): MarketRecognition {
   return "Low";
 }
 
-function alphaWindowMonths(
-  transformationStrength: number,
-  marketRecognition: MarketRecognition
-) {
-  if (transformationStrength >= 75 && marketRecognition === "Low") {
-    return 11;
+function pointsFromCount(count: number, one: number, two: number, threePlus: number) {
+  if (count >= 3) {
+    return threePlus;
   }
 
-  if (transformationStrength >= 75 && marketRecognition === "Medium") {
-    return 7;
+  if (count === 2) {
+    return two;
   }
 
-  if (transformationStrength >= 75 && marketRecognition === "High") {
-    return 2;
+  if (count === 1) {
+    return one;
   }
 
-  if (transformationStrength >= 60 && marketRecognition === "Low") {
-    return 6;
-  }
-
-  if (transformationStrength < 60) {
-    return transformationStrength >= 45 ? 2 : 1;
-  }
-
-  return marketRecognition === "Medium" ? 4 : 3;
+  return 0;
 }
 
-function classify(
+function sourceDiversityScore(activeSourceCount: number, mode: "transformation" | "confidence") {
+  if (mode === "transformation") {
+    return [0, 3, 7, 11, 15][activeSourceCount] ?? 15;
+  }
+
+  return [0, 8, 14, 20, 25][activeSourceCount] ?? 25;
+}
+
+function alphaWindowMonths(
   transformationStrength: number,
+  confidence: number,
   marketRecognition: MarketRecognition
-): Classification {
-  if (transformationStrength >= 75 && marketRecognition !== "High") {
+) {
+  if (transformationStrength < 60) {
+    return confidence < 60 ? 1 : 3;
+  }
+
+  const range =
+    marketRecognition === "High"
+      ? [1, 3]
+      : marketRecognition === "Medium"
+      ? [4, 7]
+      : [8, 12];
+
+  if (transformationStrength >= 80 && confidence >= 75) {
+    return range[1];
+  }
+
+  if (confidence < 60) {
+    return range[0];
+  }
+
+  return Math.round((range[0] + range[1]) / 2);
+}
+
+function alphaExplanation(level: MarketRecognition, months: number, transformation: number) {
+  if (transformation < 60) {
+    return `Transformation strength is below 60, so the alpha window is limited to ${months} month${months === 1 ? "" : "s"}.`;
+  }
+
+  if (level === "High") {
+    return "Because recognition is high, the estimated action window narrows to 1-3 months.";
+  }
+
+  if (level === "Medium") {
+    return "Because recognition is medium, the estimated action window sits in the 4-7 month range.";
+  }
+
+  return "Because recognition is low, the estimated action window can remain open for 8-12 months.";
+}
+
+function classify({
+  transformationStrength,
+  confidence,
+  marketRecognition,
+  alphaWindow,
+  newsCount,
+  patentSignalCount,
+  jobSignalCount
+}: {
+  transformationStrength: number;
+  confidence: number;
+  marketRecognition: MarketRecognition;
+  alphaWindow: number;
+  newsCount: number;
+  patentSignalCount: number;
+  jobSignalCount: number;
+}): Classification {
+  if (marketRecognition === "High" && alphaWindow <= 3) {
+    return "Already Recognised";
+  }
+
+  if (
+    transformationStrength >= 75 &&
+    confidence >= 70 &&
+    marketRecognition !== "High"
+  ) {
     return "Early Alpha Opportunity";
   }
 
-  if (transformationStrength >= 60 && marketRecognition === "High") {
-    return "Already Recognised";
-  }
-
-  if (transformationStrength >= 60) {
+  if (
+    transformationStrength >= 65 &&
+    confidence >= 60 &&
+    marketRecognition !== "High"
+  ) {
     return "Emerging ESG Improver";
   }
 
-  if (marketRecognition === "High") {
-    return "Already Recognised";
+  if (newsCount === 0 && (patentSignalCount > 0 || jobSignalCount > 0)) {
+    return "Innovation Watchlist";
   }
 
-  return "Watchlist";
+  return "Evidence Watchlist";
 }
 
 function investorActionFor(classification: Classification) {
   switch (classification) {
-    case "Early Alpha Opportunity":
-      return "Strong ESG transformation signals are emerging while public recognition remains incomplete. This may indicate an early-entry window before broader market pricing.";
-    case "Emerging ESG Improver":
-      return "ESG transformation signals are developing, but investors should monitor whether momentum strengthens across more sources.";
     case "Already Recognised":
-      return "ESG signals are strong, but public recognition is already high. This may be less attractive for early-alpha entry, though still relevant for ESG quality screening.";
-    case "Watchlist":
-      return "Current live signals are not strong enough for action. Keep on watchlist until stronger ESG evidence emerges.";
+      return "ESG signals are strong, but public recognition is already high. The alpha window may be narrowing.";
+    case "Early Alpha Opportunity":
+      return "Strong transformation evidence is emerging while public recognition remains incomplete. This may indicate an early-entry window.";
+    case "Emerging ESG Improver":
+      return "ESG transformation evidence is developing across multiple sources. Continue monitoring for stronger recognition lag.";
     case "Innovation Watchlist":
-      return "Live patent intelligence is monitoring ESG innovation themes, but news confirmation is not yet broad enough for an early-alpha call.";
+      return "Patent and hiring signals suggest early innovation activity, but live news recognition is limited. Monitor for confirmation.";
     case "Evidence Watchlist":
-      return "Available live evidence is useful for monitoring, but investors should wait for stronger multi-source confirmation before acting.";
+    case "Watchlist":
+      return "Current evidence is not strong enough for an investor action signal. More signals are needed.";
   }
 }
 
-function whyNowFromSignals(
-  signals: ExtractedSignal[],
-  marketRecognition: MarketRecognition,
-  patentSignalCount: number,
-  jobSignalCount: number
-) {
-  const positiveSignals = signals.filter((signal) => signal.impact === "Positive");
-  const uniqueSources = new Set(signals.map((signal) => signal.source)).size;
-
-  const reasons = [
-    signals.length >= 3
-      ? "Recent ESG-related news volume increased for this company."
-      : "Live ESG-related evidence is limited, so the signal remains early.",
-    positiveSignals.length >= 2
-      ? "Positive sustainability keywords appear across multiple live sources."
-      : "Detected ESG language is still mixed or developing across sources.",
-    `Market recognition remains ${marketRecognition.toLowerCase()}, shaping the current timing gap.`
-  ];
-
-  if (uniqueSources >= 3) {
-    reasons[1] = "ESG signals are appearing across several distinct news sources.";
+function reliabilityPoints(reliability: SourceReliability) {
+  if (reliability === "High") {
+    return 5;
   }
 
-  if (patentSignalCount >= 3) {
-    reasons[2] =
-      "Patent intelligence layer is monitoring multiple ESG innovation themes for this company.";
-  } else if (patentSignalCount > 0) {
-    reasons[2] =
-      "Patent search layer indicates ESG-related innovation signals are being monitored.";
-  }
-
-  if (jobSignalCount >= 3) {
-    reasons[1] =
-      "Hiring intelligence layer is monitoring ESG-related capability-building signals.";
-  }
-
-  return reasons;
-}
-
-function transformationBoostFromPatents(patentSignalCount: number) {
-  if (patentSignalCount >= 3) {
-    return 6;
-  }
-
-  if (patentSignalCount === 2) {
-    return 4;
-  }
-
-  if (patentSignalCount === 1) {
-    return 2;
-  }
-
-  return 0;
-}
-
-function transformationBoostFromJobs(jobSignalCount: number) {
-  if (jobSignalCount >= 3) {
-    return 6;
-  }
-
-  if (jobSignalCount > 0) {
+  if (reliability === "Medium") {
     return 3;
   }
 
-  return 0;
+  return 1;
 }
 
-function confidenceBoostFromJobs(jobSignalCount: number) {
-  if (jobSignalCount >= 3) {
-    return 4;
+function consistencyScore(signals: ExtractedSignal[]) {
+  const positiveOrNeutral = signals.filter(
+    (signal) => signal.impact === "Positive" || signal.impact === "Neutral"
+  ).length;
+  const negative = signals.filter((signal) => signal.impact === "Negative").length;
+  const total = signals.length;
+
+  if (total === 0) {
+    return 10;
   }
 
-  if (jobSignalCount > 0) {
+  if (negative > positiveOrNeutral) {
     return 2;
   }
 
-  return 0;
+  if (negative > 0 && negative / total >= 0.25) {
+    return 5;
+  }
+
+  return 10;
+}
+
+function appliedConfidenceCap({
+  rawConfidence,
+  reportSignalCount,
+  hasHighReliabilityNews,
+  newsCount,
+  patentSignalCount,
+  jobSignalCount
+}: {
+  rawConfidence: number;
+  reportSignalCount: number;
+  hasHighReliabilityNews: boolean;
+  newsCount: number;
+  patentSignalCount: number;
+  jobSignalCount: number;
+}) {
+  const caps = [{ value: 96, reason: "Maximum confidence is capped at 96 to avoid false precision." }];
+
+  if (reportSignalCount === 0) {
+    caps.push({
+      value: 92,
+      reason: "Capped at 92 because no uploaded report was included."
+    });
+  }
+
+  if (!hasHighReliabilityNews) {
+    caps.push({
+      value: 86,
+      reason: "Capped at 86 because no high-reliability news source was detected."
+    });
+  }
+
+  if (newsCount === 0) {
+    caps.push({
+      value: 82,
+      reason: "Capped at 82 because no live news was available."
+    });
+  }
+
+  if (newsCount === 0 && reportSignalCount === 0 && (patentSignalCount > 0 || jobSignalCount > 0)) {
+    caps.push({
+      value: 76,
+      reason: "Capped at 76 because only patent and hiring intelligence links were present."
+    });
+  }
+
+  const cap = caps.reduce((lowest, candidate) =>
+    candidate.value < lowest.value ? candidate : lowest
+  );
+
+  return {
+    total: Math.min(rawConfidence, cap.value),
+    explanation: cap.reason
+  };
+}
+
+function scoreModel({
+  companyId,
+  companyName,
+  signals,
+  patentSignalCount,
+  jobSignalCount,
+  reportSignalCount,
+  dataMode
+}: {
+  companyId: string;
+  companyName: string;
+  signals: ExtractedSignal[];
+  patentSignalCount: number;
+  jobSignalCount: number;
+  reportSignalCount: number;
+  dataMode: EsgScanResult["dataMode"];
+}): EsgScanResult {
+  const newsCount = signals.length;
+  const positiveSignals = signals.filter((signal) => signal.signalScore > 5);
+  const averagePositiveSignalScore =
+    positiveSignals.length > 0
+      ? positiveSignals.reduce((total, signal) => total + signal.signalScore, 0) /
+        positiveSignals.length
+      : 0;
+  const activeSourceCount = [
+    newsCount > 0,
+    patentSignalCount > 0,
+    jobSignalCount > 0,
+    reportSignalCount > 0
+  ].filter(Boolean).length;
+
+  const newsScore = clamp(
+    Math.round(positiveSignals.length * 5 + averagePositiveSignalScore * 0.5),
+    0,
+    45
+  );
+  const patentScore = pointsFromCount(patentSignalCount, 5, 10, 15);
+  const hiringScore = pointsFromCount(jobSignalCount, 5, 10, 15);
+  const reportScore = reportSignalCount >= 2 ? 10 : reportSignalCount === 1 ? 6 : 0;
+  const diversityBonus = sourceDiversityScore(activeSourceCount, "transformation");
+  const transformationStrength = clamp(
+    newsScore + patentScore + hiringScore + reportScore + diversityBonus,
+    0,
+    100
+  );
+  const marketRecognition = recognitionFromVolume(newsCount);
+  const evidenceCount = newsCount + patentSignalCount + jobSignalCount + reportSignalCount;
+  const volumeScore = Math.min(30, evidenceCount * 3);
+  const diversityScore = sourceDiversityScore(activeSourceCount, "confidence");
+  const reliabilityScore = Math.min(
+    25,
+    signals.reduce(
+      (total, signal) => total + reliabilityPoints(signal.sourceReliability),
+      0
+    ) +
+      patentSignalCount * 3 +
+      jobSignalCount * 3 +
+      reportSignalCount * 5
+  );
+  const reportSupport = reportSignalCount >= 2 ? 10 : reportSignalCount === 1 ? 6 : 0;
+  const signalConsistency = consistencyScore(signals);
+  const rawConfidence =
+    volumeScore + diversityScore + reliabilityScore + reportSupport + signalConsistency;
+  const hasHighReliabilityNews = signals.some(
+    (signal) => signal.sourceReliability === "High"
+  );
+  const cappedConfidence = appliedConfidenceCap({
+    rawConfidence,
+    reportSignalCount,
+    hasHighReliabilityNews,
+    newsCount,
+    patentSignalCount,
+    jobSignalCount
+  });
+  const confidence = cappedConfidence.total;
+  const alphaWindow = alphaWindowMonths(
+    transformationStrength,
+    confidence,
+    marketRecognition
+  );
+  const classification = classify({
+    transformationStrength,
+    confidence,
+    marketRecognition,
+    alphaWindow,
+    newsCount,
+    patentSignalCount,
+    jobSignalCount
+  });
+  const breakdown: ScoreBreakdown = {
+    transformation: {
+      total: transformationStrength,
+      newsScore,
+      patentScore,
+      hiringScore,
+      reportScore,
+      diversityBonus,
+      explanation:
+        "Transformation Strength combines ESG news strength, patent intelligence, hiring intelligence, uploaded report support, and source diversity."
+    },
+    confidence: {
+      total: confidence,
+      volumeScore,
+      diversityScore,
+      reliabilityScore,
+      reportSupport,
+      consistencyScore: signalConsistency,
+      appliedCap: cappedConfidence.explanation,
+      explanation:
+        "Confidence reflects evidence volume, source diversity, source reliability, report support, and whether signals agree directionally."
+    },
+    marketRecognition: {
+      level: marketRecognition,
+      newsArticleCount: newsCount,
+      explanation: `${newsCount} live ESG news article${newsCount === 1 ? "" : "s"} were detected, so public recognition is considered ${marketRecognition.toLowerCase()}.`
+    },
+    alphaWindow: {
+      months: alphaWindow,
+      explanation: alphaExplanation(marketRecognition, alphaWindow, transformationStrength)
+    }
+  };
+  const scoreRationale = [
+    `Transformation strength is driven by ${newsCount} ESG-related news articles, ${patentSignalCount} patent intelligence queries, ${jobSignalCount} hiring intelligence queries, and ${reportSignalCount} uploaded report signals.`,
+    `Market recognition is ${marketRecognition.toLowerCase()} because ${newsCount} public ESG news articles were detected.`,
+    cappedConfidence.explanation,
+    marketRecognition === "High"
+      ? "Alpha window is short because public recognition is already high."
+      : "Alpha window remains wider because public recognition is not yet high."
+  ];
+
+  if (newsCount === 0) {
+    scoreRationale.unshift(
+      "Live news was unavailable for this scan, so the alpha window is based on patent, hiring, and report signals."
+    );
+  }
+
+  return {
+    companyId,
+    companyName,
+    generatedAt: new Date().toISOString(),
+    dataMode,
+    transformationStrength,
+    marketRecognition,
+    confidence,
+    alphaWindowMonths: alphaWindow,
+    classification,
+    investorAction: investorActionFor(classification),
+    whyNow: scoreRationale.slice(0, 3),
+    evidenceTimeline: [...signals].sort((a, b) => b.signalScore - a.signalScore).slice(0, 4),
+    scoreBreakdown: breakdown,
+    scoreRationale
+  };
 }
 
 export function scoreSignals({
@@ -173,100 +399,25 @@ export function scoreSignals({
   signals,
   patentSignalCount = 0,
   jobSignalCount = 0,
-  hasAdditionalSource = false
+  reportSignalCount = 0
 }: {
   companyId: string;
   companyName: string;
   signals: ExtractedSignal[];
   patentSignalCount?: number;
   jobSignalCount?: number;
+  reportSignalCount?: number;
   hasAdditionalSource?: boolean;
 }): EsgScanResult {
-  const relevantSignals = signals;
-  const positiveSignals = relevantSignals.filter(
-    (signal) => signal.signalScore > 5
-  );
-  const negativeSignals = relevantSignals.filter(
-    (signal) => signal.signalScore < -5
-  );
-  const averagePositiveScore =
-    relevantSignals.length > 0
-      ? relevantSignals.reduce(
-          (total, signal) => total + Math.max(0, signal.signalScore),
-          0
-        ) / relevantSignals.length
-      : 0;
-
-  const transformationStrength = clamp(
-    Math.round(
-      18 +
-        averagePositiveScore * 1.8 +
-        positiveSignals.length * 5 +
-        relevantSignals.length * 3 -
-        negativeSignals.length * 8 +
-        transformationBoostFromPatents(patentSignalCount) +
-        transformationBoostFromJobs(jobSignalCount)
-    ),
-    0,
-    100
-  );
-  const marketRecognition = recognitionFromVolume(relevantSignals.length);
-  const sourceCount = new Set(relevantSignals.map((signal) => signal.source)).size;
-  const clearSignals = relevantSignals.filter(
-    (signal) => Math.abs(signal.signalScore) > 5
-  ).length;
-  const consistency =
-    relevantSignals.length === 0
-      ? 0
-      : Math.abs(positiveSignals.length - negativeSignals.length) /
-        relevantSignals.length;
-  const confidence = clamp(
-    Math.round(
-      28 +
-        relevantSignals.length * 4 +
-        sourceCount * 4 +
-        clearSignals * 3 +
-        consistency * 18 +
-        Math.min(4, patentSignalCount + 1) +
-        confidenceBoostFromJobs(jobSignalCount)
-    ),
-    0,
-    100
-  );
-  const alphaWindow = alphaWindowMonths(
-    transformationStrength,
-    marketRecognition
-  );
-  let classification = classify(transformationStrength, marketRecognition);
-
-  if (
-    classification === "Early Alpha Opportunity" &&
-    !hasAdditionalSource
-  ) {
-    classification = "Emerging ESG Improver";
-  }
-
-  return {
+  return scoreModel({
     companyId,
     companyName,
-    generatedAt: new Date().toISOString(),
-    dataMode: "live",
-    transformationStrength,
-    marketRecognition,
-    confidence,
-    alphaWindowMonths: alphaWindow,
-    classification,
-    investorAction: investorActionFor(classification),
-    whyNow: whyNowFromSignals(
-      relevantSignals,
-      marketRecognition,
-      patentSignalCount,
-      jobSignalCount
-    ),
-    evidenceTimeline: relevantSignals
-      .sort((a, b) => b.signalScore - a.signalScore)
-      .slice(0, 4)
-  };
+    signals,
+    patentSignalCount,
+    jobSignalCount,
+    reportSignalCount,
+    dataMode: "live"
+  });
 }
 
 export function scorePartialLiveSignals({
@@ -274,64 +425,23 @@ export function scorePartialLiveSignals({
   companyName,
   patentSignalCount,
   jobSignalCount,
+  reportSignalCount = 0,
   hasReportSignal
 }: {
   companyId: string;
   companyName: string;
   patentSignalCount: number;
   jobSignalCount: number;
+  reportSignalCount?: number;
   hasReportSignal: boolean;
 }): EsgScanResult {
-  const patentBoost = transformationBoostFromPatents(patentSignalCount);
-  const jobBoost = transformationBoostFromJobs(jobSignalCount);
-  const transformationStrength = clamp(
-    58 +
-      patentSignalCount * 5 +
-      patentBoost +
-      jobSignalCount * 4 +
-      jobBoost +
-      (hasReportSignal ? 6 : 0),
-    60,
-    80
-  );
-  const confidenceCap = hasReportSignal ? 88 : 82;
-  const confidence = clamp(
-    54 +
-      patentSignalCount * 7 +
-      jobSignalCount * 5 +
-      confidenceBoostFromJobs(jobSignalCount) +
-      (hasReportSignal ? 8 : 0),
-    55,
-    confidenceCap
-  );
-  const classification: Classification =
-    (patentSignalCount > 0 || jobSignalCount > 0) && !hasReportSignal
-      ? "Innovation Watchlist"
-      : "Evidence Watchlist";
-  const whyNow = [
-    jobSignalCount >= 3
-      ? "Hiring intelligence layer is monitoring ESG-related capability-building signals."
-      : patentSignalCount >= 3
-      ? "Patent intelligence layer is monitoring multiple ESG innovation themes for this company."
-      : "Live news was unavailable for this scan, so the alpha window is based on patent, hiring, and report signals.",
-    hasReportSignal
-      ? "Uploaded report evidence has been included as a high-reliability source for the next parsing module."
-      : "Live news was unavailable for this scan, so the alpha window is based on patent, hiring, and report signals.",
-    "The alpha window remains open for monitoring while stronger news confirmation develops."
-  ];
-
-  return {
+  return scoreModel({
     companyId,
     companyName,
-    generatedAt: new Date().toISOString(),
-    dataMode: "partial_live",
-    transformationStrength,
-    marketRecognition: "Low",
-    confidence,
-    alphaWindowMonths: patentSignalCount >= 3 ? 10 : 8,
-    classification,
-    investorAction: investorActionFor(classification),
-    whyNow,
-    evidenceTimeline: []
-  };
+    signals: [],
+    patentSignalCount,
+    jobSignalCount,
+    reportSignalCount: hasReportSignal ? Math.max(1, reportSignalCount) : 0,
+    dataMode: "partial_live"
+  });
 }

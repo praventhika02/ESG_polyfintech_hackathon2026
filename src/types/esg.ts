@@ -55,6 +55,37 @@ export type ExtractedSignal = {
   sourceReliability: SourceReliability;
 };
 
+export type ScoreBreakdown = {
+  transformation: {
+    total: number;
+    newsScore: number;
+    patentScore: number;
+    hiringScore: number;
+    reportScore: number;
+    diversityBonus: number;
+    explanation: string;
+  };
+  confidence: {
+    total: number;
+    volumeScore: number;
+    diversityScore: number;
+    reliabilityScore: number;
+    reportSupport: number;
+    consistencyScore: number;
+    appliedCap: string;
+    explanation: string;
+  };
+  marketRecognition: {
+    level: MarketRecognition;
+    newsArticleCount: number;
+    explanation: string;
+  };
+  alphaWindow: {
+    months: number;
+    explanation: string;
+  };
+};
+
 export type EsgScanResult = {
   companyId: string;
   companyName: string;
@@ -75,4 +106,6 @@ export type EsgScanResult = {
   reportSignalsFound?: number;
   queryUsed?: string;
   providerUsed?: ProviderUsed;
+  scoreBreakdown?: ScoreBreakdown;
+  scoreRationale?: string[];
 };
