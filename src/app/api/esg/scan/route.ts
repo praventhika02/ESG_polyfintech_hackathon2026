@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchLiveEsgNews } from "@/lib/esg/providers/newsProvider";
+import { getPatentSignals } from "@/lib/esg/providers/patentProvider";
 import { scoreSignals } from "@/lib/esg/scoring";
 import { extractSignalsFromArticles } from "@/lib/esg/signalExtraction";
 import { mockResults } from "@/lib/esg/mockResults";
@@ -111,8 +112,51 @@ function fallbackResult(
       sourceReliability: "Medium"
     })),
     articlesFound: debug?.articlesFound ?? 0,
+    patentSignalsFound: 0,
     queryUsed: debug?.queryUsed ?? "Demo fallback",
     providerUsed: debug?.providerUsed ?? "fallback"
+  };
+}
+
+function patentSignalsToEvidence(
+  patentSignals: Awaited<ReturnType<typeof getPatentSignals>>
+): EsgScanResult["evidenceTimeline"] {
+  return patentSignals.map((signal) => ({
+    date: new Intl.DateTimeFormat("en", {
+      month: "short",
+      year: "numeric"
+    }).format(new Date(signal.publishedAt)),
+    sourceType: "Patents",
+    title: signal.title,
+    summary: signal.snippet,
+    url: signal.url,
+    impact: "Neutral",
+    signalScore: signal.signalScore,
+    positiveKeywordCount: 1,
+    negativeKeywordCount: 0,
+    source: signal.source,
+    sourceReliability: "Medium"
+  }));
+}
+
+function withPatentSignals(
+  result: EsgScanResult,
+  patentSignals: Awaited<ReturnType<typeof getPatentSignals>>
+): EsgScanResult {
+  if (patentSignals.length === 0) {
+    return {
+      ...result,
+      patentSignalsFound: 0
+    };
+  }
+
+  return {
+    ...result,
+    patentSignalsFound: patentSignals.length,
+    evidenceTimeline: [
+      ...patentSignalsToEvidence(patentSignals),
+      ...result.evidenceTimeline
+    ]
   };
 }
 
@@ -168,14 +212,23 @@ export async function POST(request: Request) {
 
     console.log("[API] Scan started", companyName);
 
-    const liveNews = await withTimeout(fetchLiveEsgNews(companyName), 14000);
+    const [liveNews, patentSignals] = await Promise.all([
+      withTimeout(fetchLiveEsgNews(companyName), 14000),
+      getPatentSignals(companyName).catch((error) => {
+        console.error("Patent signal fetch failed", error);
+        return [];
+      })
+    ]);
 
     if (liveNews.articles.length === 0) {
-      const fallback = fallbackResult(companyId, companyName, {
-        articlesFound: liveNews.articlesFound,
-        queryUsed: liveNews.queryUsed,
-        providerUsed: "fallback"
-      });
+      const fallback = withPatentSignals(
+        fallbackResult(companyId, companyName, {
+          articlesFound: liveNews.articlesFound,
+          queryUsed: liveNews.queryUsed,
+          providerUsed: "fallback"
+        }),
+        patentSignals
+      );
 
       console.log("[API] Returning response", {
         dataMode: fallback.dataMode,
@@ -189,16 +242,21 @@ export async function POST(request: Request) {
     const liveResult = scoreSignals({
       companyId,
       companyName,
-      signals
+      signals,
+      hasPatentSignal: patentSignals.length > 0
     });
 
     liveResult.articlesFound = liveNews.articlesFound;
+    liveResult.patentSignalsFound = patentSignals.length;
     liveResult.queryUsed = liveNews.queryUsed;
     liveResult.providerUsed = liveNews.providerUsed;
     liveResult.investorAction =
       investorActionForClassification(liveResult.classification) ??
       liveResult.investorAction;
-    const responseResult = withUploadedReportSignal(liveResult, reportFileName);
+    const responseResult = withUploadedReportSignal(
+      withPatentSignals(liveResult, patentSignals),
+      reportFileName
+    );
 
     console.log("[API] Returning response", {
       dataMode: responseResult.dataMode,

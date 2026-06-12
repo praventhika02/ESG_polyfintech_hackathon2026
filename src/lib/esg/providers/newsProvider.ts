@@ -272,6 +272,10 @@ function stripHtml(value: string) {
 
 function cleanRssText(value: string, source: string) {
   const withoutTrailingSource = value
+    .replace(/â/g, "'")
+    .replace(/â/g, "'")
+    .replace(/â/g, "-")
+    .replace(/â/g, "-")
     .replace(new RegExp(`\\s*-\\s*${source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "i"), "")
     .replace(new RegExp(`\\s+${source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "i"), "");
 

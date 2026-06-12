@@ -60,6 +60,7 @@ export type EsgScanResult = {
   whyNow: string[];
   evidenceTimeline: ExtractedSignal[];
   articlesFound?: number;
+  patentSignalsFound?: number;
   queryUsed?: string;
   providerUsed?: ProviderUsed;
 };

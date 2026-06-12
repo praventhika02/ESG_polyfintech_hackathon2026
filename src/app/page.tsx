@@ -86,6 +86,7 @@ function demoFallbackResult(companyId: CompanyId, companyName: string): EsgScanR
       sourceReliability: "Medium"
     })),
     articlesFound: 0,
+    patentSignalsFound: 0,
     queryUsed: "Client fallback",
     providerUsed: "fallback"
   };
@@ -191,7 +192,7 @@ export default function Home() {
               <ResultSummary company={selectedCompany} result={scanResult} />
               {process.env.NODE_ENV === "development" ? (
                 <section className="glass-panel rounded-2xl p-4">
-                  <div className="grid gap-3 text-sm text-[#42534d] sm:grid-cols-5">
+                  <div className="grid gap-3 text-sm text-[#42534d] sm:grid-cols-6">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900/60">
                         providerUsed
@@ -212,6 +213,14 @@ export default function Home() {
                       </p>
                       <p className="mt-1 font-mono">
                         {scanResult.articlesFound ?? 0}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900/60">
+                        patentSignalsFound
+                      </p>
+                      <p className="mt-1 font-mono">
+                        {scanResult.patentSignalsFound ?? 0}
                       </p>
                     </div>
                     <div className="sm:col-span-1">
