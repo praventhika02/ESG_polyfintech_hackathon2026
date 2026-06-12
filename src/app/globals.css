@@ -41,3 +41,27 @@ a {
     linear-gradient(90deg, rgba(30, 92, 82, 0.07) 1px, transparent 1px);
   background-size: 34px 34px;
 }
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .no-print,
+  button,
+  details {
+    display: none !important;
+  }
+
+  .glass-panel {
+    break-inside: avoid;
+    border: 1px solid #d9e2de;
+    background: #ffffff;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+}

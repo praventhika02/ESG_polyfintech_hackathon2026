@@ -2,17 +2,22 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useState } from "react";
+import { AiInvestmentSummary } from "@/components/esg-alpha/AiInvestmentSummary";
 import { CompanySelector } from "@/components/esg-alpha/CompanySelector";
+import { CompanyComparison } from "@/components/esg-alpha/CompanyComparison";
 import { AnnualReportUpload } from "@/components/esg-alpha/AnnualReportUpload";
 import { EvidenceTimeline } from "@/components/esg-alpha/EvidenceTimeline";
+import { ExportReportActions } from "@/components/esg-alpha/ExportReportActions";
 import { FinalVerdictPanel } from "@/components/esg-alpha/FinalVerdictPanel";
 import { HeroSection } from "@/components/esg-alpha/HeroSection";
+import { MomentumTimeline } from "@/components/esg-alpha/MomentumTimeline";
+import { ReportFindingsPanel } from "@/components/esg-alpha/ReportFindingsPanel";
 import { ResultSummary } from "@/components/esg-alpha/ResultSummary";
 import { ScanButton } from "@/components/esg-alpha/ScanButton";
 import { ScanningPanel } from "@/components/esg-alpha/ScanningPanel";
 import { ScoreMethodologyPanel } from "@/components/esg-alpha/ScoreMethodologyPanel";
 import { SignalSourcePanel } from "@/components/esg-alpha/SignalSourcePanel";
-import { demoCompanies, type CompanyId } from "@/lib/esg/mockCompanies";
+import { demoCompanies, type CompanyId, type MockCompany } from "@/lib/esg/mockCompanies";
 import { mockResults } from "@/lib/esg/mockResults";
 import { verifyReportFileNames } from "@/lib/esg/reportVerification";
 import type { EsgScanResult, EvidenceImpact, EvidenceSourceType } from "@/types/esg";
@@ -106,6 +111,7 @@ function demoFallbackResult(companyId: CompanyId, companyName: string): EsgScanR
     jobSignalsFound: 0,
     reportSignalIncluded: false,
     reportSignalsFound: 0,
+    reportFindings: [],
     queryUsed: "Client fallback",
     providerUsed: "fallback"
   };
@@ -135,14 +141,8 @@ export default function Home() {
     setScanResult(null);
   }
 
-  async function handleRunScan() {
-    if (!selectedCompany) {
-      return;
-    }
-
-    console.log("[Scan UI] Starting scan", selectedCompany.name);
-    setIsScanning(true);
-    setScanResult(null);
+  async function runCompanyScan(company: MockCompany, reports = reportFileNames) {
+    console.log("[Scan UI] Starting scan", company.name);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {
       controller.abort();
@@ -155,9 +155,9 @@ export default function Home() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          companyId: selectedCompany.id,
-          companyName: selectedCompany.name,
-          reportFileNames
+          companyId: company.id,
+          companyName: company.name,
+          reportFileNames: reports
         }),
         signal: controller.signal
       });
@@ -169,14 +169,29 @@ export default function Home() {
       const data = (await response.json()) as EsgScanResult;
 
       console.log("[Scan UI] Received scan result", data);
-      setScanResult(data);
+      return data;
     } catch (error) {
       console.error("[Scan UI] Scan failed:", error);
-      setScanResult(demoFallbackResult(selectedCompany.id, selectedCompany.name));
+      return demoFallbackResult(company.id, company.name);
     } finally {
       window.clearTimeout(timeout);
-      setIsScanning(false);
       console.log("[Scan UI] Scan finished");
+    }
+  }
+
+  async function handleRunScan() {
+    if (!selectedCompany) {
+      return;
+    }
+
+    setIsScanning(true);
+    setScanResult(null);
+
+    try {
+      const result = await runCompanyScan(selectedCompany, reportFileNames);
+      setScanResult(result);
+    } finally {
+      setIsScanning(false);
     }
   }
 
@@ -198,6 +213,8 @@ export default function Home() {
           selectedCompanyName={selectedCompany.name}
         />
 
+        <CompanyComparison companies={demoCompanies} onScanCompany={runCompanyScan} />
+
         <section className="glass-panel rounded-2xl p-5 sm:p-6">
           <ScanButton isScanning={isScanning} onRunScan={handleRunScan} />
         </section>
@@ -215,6 +232,7 @@ export default function Home() {
               transition={{ duration: 0.25 }}
             >
               <ResultSummary company={selectedCompany} result={scanResult} />
+              <AiInvestmentSummary result={scanResult} />
               <SignalSourcePanel
                 providerUsed={scanResult.providerUsed}
                 dataMode={scanResult.dataMode}
@@ -228,9 +246,15 @@ export default function Home() {
                 queryUsed={scanResult.queryUsed}
                 generatedAt={scanResult.generatedAt}
               />
+              <ReportFindingsPanel
+                findings={scanResult.reportFindings}
+                verifications={scanResult.reportVerifications}
+              />
               <ScoreMethodologyPanel result={scanResult} />
+              <MomentumTimeline events={scanResult.evidenceTimeline} />
               <EvidenceTimeline events={scanResult.evidenceTimeline} />
               <FinalVerdictPanel result={scanResult} />
+              <ExportReportActions />
             </motion.div>
           ) : (
             <motion.section

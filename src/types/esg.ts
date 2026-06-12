@@ -41,6 +41,14 @@ export type ReportVerification = {
   message: string;
 };
 
+export type ReportFinding = {
+  fileName: string;
+  verified: boolean;
+  themesDetected: string[];
+  keyPhrases: string[];
+  reportConfidence: "Low" | "Medium" | "High";
+};
+
 export type NewsArticle = {
   title: string;
   snippet: string;
@@ -128,6 +136,7 @@ export type EsgScanResult = {
   verifiedReportsFound?: number;
   mismatchedReportsFound?: number;
   reportVerifications?: ReportVerification[];
+  reportFindings?: ReportFinding[];
   recognitionScore?: number;
   recognitionGap?: number;
   gapInterpretation?: string;

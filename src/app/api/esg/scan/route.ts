@@ -6,6 +6,7 @@ import { scorePartialLiveSignals, scoreSignals } from "@/lib/esg/scoring";
 import { extractSignalsFromArticles } from "@/lib/esg/signalExtraction";
 import { mockResults } from "@/lib/esg/mockResults";
 import { verifyReportFileNames } from "@/lib/esg/reportVerification";
+import { extractReportFindings, reportThemeCount } from "@/lib/esg/reportExtraction";
 import type {
   EsgScanResult,
   EvidenceImpact,
@@ -192,6 +193,7 @@ function fallbackResult(
     verifiedReportsFound: 0,
     mismatchedReportsFound: 0,
     reportVerifications: [],
+    reportFindings: [],
     recognitionScore: 0,
     recognitionGap: fallback.transformationStrength,
     gapInterpretation: "Transformation signals are ahead of market recognition.",
@@ -339,9 +341,9 @@ function withJobSignals(
 
 function withUploadedReportSignal(
   result: EsgScanResult,
-  reportFileNames: string[]
+  reportFindings: NonNullable<EsgScanResult["reportFindings"]>
 ): EsgScanResult {
-  if (reportFileNames.length === 0) {
+  if (reportFindings.length === 0) {
     return {
       ...result,
       reportSignalIncluded: false,
@@ -349,25 +351,28 @@ function withUploadedReportSignal(
     };
   }
 
-  const reportEvidence = reportFileNames.slice(0, 3).map((fileName, index) => {
-    const remainingCount = reportFileNames.length - 2;
-    const isSummary = reportFileNames.length > 3 && index === 2;
+  const reportEvidence = reportFindings.slice(0, 3).map((finding, index) => {
+    const remainingCount = reportFindings.length - 2;
+    const isSummary = reportFindings.length > 3 && index === 2;
+    const themeCount = finding.themesDetected.length;
 
     return {
       date: "Uploaded",
       sourceType: "Reports" as const,
       title: isSummary
         ? `+${remainingCount} additional reports included in scan`
-        : `Uploaded report included: ${fileName}`,
+        : `Verified report ESG evidence: ${finding.fileName}`,
       summary: isSummary
         ? "Additional uploaded reports have been included as company disclosure signals for ESG transformation review."
-        : "This report has been included as a company disclosure signal for ESG transformation review.",
+        : finding.themesDetected.length > 0
+        ? `Detected ESG themes: ${finding.themesDetected.join(", ")}.`
+        : "Verified company report included as disclosure evidence; full PDF text parsing is planned for the next module.",
       url: "",
-      impact: "Neutral" as const,
-      signalScore: 5,
-      positiveKeywordCount: 0,
+      impact: themeCount > 0 ? ("Positive" as const) : ("Neutral" as const),
+      signalScore: Math.min(20, Math.max(5, themeCount * 3 + 5)),
+      positiveKeywordCount: themeCount,
       negativeKeywordCount: 0,
-      source: isSummary ? "Multiple uploaded reports" : fileName,
+      source: isSummary ? "Multiple uploaded reports" : finding.fileName,
       sourceReliability: "High" as const
     };
   });
@@ -375,7 +380,7 @@ function withUploadedReportSignal(
   return {
     ...result,
     reportSignalIncluded: true,
-    reportSignalsFound: reportFileNames.length,
+    reportSignalsFound: reportFindings.length,
     evidenceTimeline: [...reportEvidence, ...result.evidenceTimeline]
   };
 }
@@ -410,6 +415,8 @@ export async function POST(request: Request) {
     const verifiedReportFileNames = reportVerifications
       .filter((report) => report.status === "verified")
       .map((report) => report.fileName);
+    const reportFindings = extractReportFindings(verifiedReportFileNames);
+    const uniqueReportThemeCount = reportThemeCount(reportFindings);
     const needsReviewReportCount = reportVerifications.filter(
       (report) => report.status === "needs_review"
     ).length;
@@ -475,6 +482,7 @@ export async function POST(request: Request) {
         patentSignalCount: patentCount,
         jobSignalCount: jobCount,
         reportSignalCount: verifiedReportFileNames.length,
+        reportThemeCount: uniqueReportThemeCount,
         needsReviewReportCount,
         hasReportSignal
       });
@@ -488,6 +496,7 @@ export async function POST(request: Request) {
       partialResult.verifiedReportsFound = verifiedReportFileNames.length;
       partialResult.mismatchedReportsFound = mismatchedReportCount;
       partialResult.reportVerifications = reportVerifications;
+      partialResult.reportFindings = reportFindings;
       partialResult.queryUsed =
         patentCount > 0
           ? "Google Patents ESG innovation queries"
@@ -497,7 +506,7 @@ export async function POST(request: Request) {
 
       const responseResult = withUploadedReportSignal(
         withJobSignals(withPatentSignals(partialResult, patentSignals), jobSignals),
-        verifiedReportFileNames
+        reportFindings
       );
 
       console.log("[API] Returning response", {
@@ -516,6 +525,7 @@ export async function POST(request: Request) {
       patentSignalCount: patentCount,
       jobSignalCount: jobCount,
       reportSignalCount: verifiedReportFileNames.length,
+      reportThemeCount: uniqueReportThemeCount,
       needsReviewReportCount,
       hasAdditionalSource: patentCount > 0 || jobCount > 0 || hasReportSignal
     });
@@ -528,6 +538,7 @@ export async function POST(request: Request) {
     liveResult.verifiedReportsFound = verifiedReportFileNames.length;
     liveResult.mismatchedReportsFound = mismatchedReportCount;
     liveResult.reportVerifications = reportVerifications;
+    liveResult.reportFindings = reportFindings;
     liveResult.queryUsed = liveNews.queryUsed;
     liveResult.providerUsed = providerUsed;
     liveResult.investorAction =
@@ -535,7 +546,7 @@ export async function POST(request: Request) {
       liveResult.investorAction;
     const responseResult = withUploadedReportSignal(
       withJobSignals(withPatentSignals(liveResult, patentSignals), jobSignals),
-      verifiedReportFileNames
+      reportFindings
     );
 
     console.log("[API] Returning response", {

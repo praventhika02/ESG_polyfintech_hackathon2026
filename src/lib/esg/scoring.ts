@@ -282,6 +282,7 @@ function scoreModel({
   patentSignalCount,
   jobSignalCount,
   verifiedReportCount,
+  reportThemeCount,
   dataMode
 }: {
   companyId: string;
@@ -290,6 +291,7 @@ function scoreModel({
   patentSignalCount: number;
   jobSignalCount: number;
   verifiedReportCount: number;
+  reportThemeCount: number;
   dataMode: EsgScanResult["dataMode"];
 }): EsgScanResult {
   const newsCount = signals.length;
@@ -317,7 +319,8 @@ function scoreModel({
   );
   const patentScore = pointsFromCount(patentSignalCount, 3, 6, 10);
   const hiringScore = pointsFromCount(jobSignalCount, 3, 6, 10);
-  const reportScore = verifiedReportCount >= 2 ? 15 : verifiedReportCount === 1 ? 8 : 0;
+  const reportScore =
+    reportThemeCount >= 6 ? 15 : reportThemeCount >= 3 ? 10 : reportThemeCount >= 1 ? 5 : 0;
   const diversityBonus = sourceDiversityScore(activeSourceCount, "transformation");
   const transformationStrength = clamp(
     newsScore + patentScore + hiringScore + reportScore + diversityBonus,
@@ -448,6 +451,7 @@ export function scoreSignals(params: {
   patentSignalCount?: number;
   jobSignalCount?: number;
   reportSignalCount?: number;
+  reportThemeCount?: number;
   needsReviewReportCount?: number;
   hasAdditionalSource?: boolean;
 }): EsgScanResult {
@@ -457,7 +461,8 @@ export function scoreSignals(params: {
     signals,
     patentSignalCount = 0,
     jobSignalCount = 0,
-    reportSignalCount = 0
+    reportSignalCount = 0,
+    reportThemeCount = 0
   } = params;
 
   return scoreModel({
@@ -467,6 +472,7 @@ export function scoreSignals(params: {
     patentSignalCount,
     jobSignalCount,
     verifiedReportCount: reportSignalCount,
+    reportThemeCount,
     dataMode: "live"
   });
 }
@@ -477,6 +483,7 @@ export function scorePartialLiveSignals(params: {
   patentSignalCount: number;
   jobSignalCount: number;
   reportSignalCount?: number;
+  reportThemeCount?: number;
   needsReviewReportCount?: number;
   hasReportSignal: boolean;
 }): EsgScanResult {
@@ -485,7 +492,8 @@ export function scorePartialLiveSignals(params: {
     companyName,
     patentSignalCount,
     jobSignalCount,
-    reportSignalCount = 0
+    reportSignalCount = 0,
+    reportThemeCount = 0
   } = params;
 
   return scoreModel({
@@ -495,6 +503,7 @@ export function scorePartialLiveSignals(params: {
     patentSignalCount,
     jobSignalCount,
     verifiedReportCount: reportSignalCount,
+    reportThemeCount,
     dataMode: "partial_live"
   });
 }
