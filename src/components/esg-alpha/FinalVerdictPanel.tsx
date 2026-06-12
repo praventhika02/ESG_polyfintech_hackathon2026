@@ -12,6 +12,7 @@ import {
   Target,
   TrendingUp
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { Classification, EsgScanResult } from "@/types/esg";
 
 type FinalVerdictPanelProps = {
@@ -21,9 +22,10 @@ type FinalVerdictPanelProps = {
 type Decision = {
   label: string;
   tone: string;
-  icon: typeof Target;
+  icon: LucideIcon;
   nextSteps: string[];
   message: string;
+  changeTrigger: string;
 };
 
 function decisionFor(classification: Classification, companyName: string): Decision {
@@ -34,7 +36,9 @@ function decisionFor(classification: Classification, companyName: string): Decis
         tone: "border-emerald-200 bg-emerald-100 text-emerald-800",
         icon: TrendingUp,
         message:
-          "Strong transformation evidence is present while public recognition remains incomplete.",
+          "Transformation signals are stronger than current market recognition, creating a potential early-entry window.",
+        changeTrigger:
+          "Formal ESG rating upgrades or heavy analyst coverage would reduce the alpha gap.",
         nextSteps: [
           "Prioritise deeper due diligence immediately.",
           "Compare current valuation against peers before market recognition catches up.",
@@ -47,7 +51,9 @@ function decisionFor(classification: Classification, companyName: string): Decis
         tone: "border-teal-200 bg-teal-100 text-teal-800",
         icon: Eye,
         message:
-          "Signals are building, but the recognition gap needs stronger confirmation.",
+          "Transformation evidence is developing, but the recognition gap is not large enough for a strong early-alpha call.",
+        changeTrigger:
+          "More high-quality evidence or a wider recognition gap could upgrade this to Early Alpha Opportunity.",
         nextSteps: [
           "Add to active watchlist.",
           "Re-scan after new quarterly updates or report releases.",
@@ -59,7 +65,9 @@ function decisionFor(classification: Classification, companyName: string): Decis
         label: "Already Priced In",
         tone: "border-amber-200 bg-amber-100 text-amber-800",
         icon: ShieldCheck,
-        message: `${companyName} shows strong ESG activity, but public recognition is already high.`,
+        message: `${companyName} shows ESG activity, but public recognition has already caught up, reducing the early-alpha window.`,
+        changeTrigger:
+          "New transformation signals without matching public recognition could reopen the alpha window.",
         nextSteps: [
           "Compare valuation against ESG peers before entering.",
           "Monitor whether recognition continues converting into financial performance.",
@@ -72,7 +80,9 @@ function decisionFor(classification: Classification, companyName: string): Decis
         tone: "border-violet-200 bg-violet-100 text-violet-800",
         icon: Hourglass,
         message:
-          "Patent and hiring layers suggest early activity, but public confirmation is still limited.",
+          "Patent and hiring layers show early innovation activity, but public evidence is not yet strong enough.",
+        changeTrigger:
+          "Confirmed news, report disclosures, or high-reliability evidence could upgrade this to Emerging ESG Improver.",
         nextSteps: [
           "Monitor patent and hiring signals for confirmation.",
           "Wait for stronger live news or report evidence.",
@@ -86,6 +96,8 @@ function decisionFor(classification: Classification, companyName: string): Decis
         tone: "border-rose-200 bg-rose-100 text-rose-800",
         icon: AlertTriangle,
         message: "The evidence is not yet strong enough for an investor action signal.",
+        changeTrigger:
+          "More consistent evidence across news, reports, jobs, and patents could move this into watchlist status.",
         nextSteps: [
           "Do not act yet.",
           "Wait for stronger source diversity.",
@@ -137,7 +149,9 @@ export function FinalVerdictPanel({ result }: FinalVerdictPanelProps) {
             </div>
             <div className="rounded-xl bg-white/10 p-3">
               <p className="text-xs text-emerald-100/70">Recognition</p>
-              <p className="mt-1 font-semibold">{result.marketRecognition}</p>
+              <p className="mt-1 font-semibold">
+                {result.marketRecognition} ({result.recognitionScore ?? 0}/100)
+              </p>
             </div>
             <div className="rounded-xl bg-white/10 p-3">
               <p className="text-xs text-emerald-100/70">Confidence</p>
@@ -146,9 +160,9 @@ export function FinalVerdictPanel({ result }: FinalVerdictPanelProps) {
               </p>
             </div>
             <div className="rounded-xl bg-white/10 p-3">
-              <p className="text-xs text-emerald-100/70">Strength</p>
+              <p className="text-xs text-emerald-100/70">Recognition Gap</p>
               <p className="mt-1 font-semibold">
-                {result.transformationStrength}/100
+                {result.recognitionGap ?? 0}
               </p>
             </div>
           </div>
@@ -191,6 +205,14 @@ export function FinalVerdictPanel({ result }: FinalVerdictPanelProps) {
               </div>
             ))}
           </div>
+          <div className="mt-4 rounded-xl border border-white/70 bg-white/52 p-3">
+            <p className="text-sm font-semibold text-[#17211e]">
+              What would change the verdict
+            </p>
+            <p className="mt-1 text-sm leading-6 text-[#596662]">
+              {decision.changeTrigger}
+            </p>
+          </div>
         </motion.div>
       </div>
 
@@ -205,8 +227,16 @@ export function FinalVerdictPanel({ result }: FinalVerdictPanelProps) {
             </p>
             <p className="mt-2 text-sm leading-6 text-[#596662]">
               Traditional ESG tools tell investors who looks good today. ESG
-              Alpha Gap focuses on timing: who is changing, whether the market
-              has recognised it, and how much action window may remain.
+              Alpha Gap focuses on timing: who is changing, how much the market
+              has recognised it, and whether an alpha window still exists.
+            </p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[#465651]">
+              Best use case: finding companies where transformation evidence is
+              ahead of market recognition.
+            </p>
+            <p className="mt-2 text-xs font-semibold leading-5 text-emerald-900/75">
+              Verdicts are generated from live evidence layers and verified
+              uploaded documents. No company-specific scoring bias is applied.
             </p>
           </div>
           <ArrowRight className="mt-2 hidden h-5 w-5 shrink-0 text-emerald-700 sm:block" />

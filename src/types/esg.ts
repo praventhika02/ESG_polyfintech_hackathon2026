@@ -32,6 +32,15 @@ export type EvidenceImpact = "Positive" | "Neutral" | "Negative";
 
 export type SourceReliability = "High" | "Medium" | "Low";
 
+export type ReportVerificationStatus = "verified" | "mismatch" | "needs_review";
+
+export type ReportVerification = {
+  fileName: string;
+  status: ReportVerificationStatus;
+  detectedCompanyHint: string | null;
+  message: string;
+};
+
 export type NewsArticle = {
   title: string;
   snippet: string;
@@ -78,6 +87,18 @@ export type ScoreBreakdown = {
   marketRecognition: {
     level: MarketRecognition;
     newsArticleCount: number;
+    recognitionScore: number;
+    newsVisibilityScore: number;
+    formalRecognitionScore: number;
+    institutionalVisibilityScore: number;
+    sourceReliabilityVisibilityScore: number;
+    explanation: string;
+  };
+  recognitionGap: {
+    transformationStrength: number;
+    recognitionScore: number;
+    gap: number;
+    interpretation: string;
     explanation: string;
   };
   alphaWindow: {
@@ -104,6 +125,12 @@ export type EsgScanResult = {
   jobSignalsFound?: number;
   reportSignalIncluded?: boolean;
   reportSignalsFound?: number;
+  verifiedReportsFound?: number;
+  mismatchedReportsFound?: number;
+  reportVerifications?: ReportVerification[];
+  recognitionScore?: number;
+  recognitionGap?: number;
+  gapInterpretation?: string;
   queryUsed?: string;
   providerUsed?: ProviderUsed;
   scoreBreakdown?: ScoreBreakdown;

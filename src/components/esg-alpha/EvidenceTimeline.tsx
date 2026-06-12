@@ -33,33 +33,33 @@ const reliabilityTone = {
   Low: "bg-slate-100 text-slate-700 border-slate-200"
 };
 
-const groupOrder: EvidenceSourceType[] = ["Jobs", "Patents", "News", "Reports"];
+const groupOrder: EvidenceSourceType[] = ["Reports", "Jobs", "Patents", "News"];
 
 const groupTitles: Partial<Record<EvidenceSourceType, string>> = {
   Jobs: "Hiring Signals",
   Patents: "Patent Signals",
   News: "News Signals",
-  Reports: "Report Signals"
+  Reports: "Verified Report Evidence"
 };
 
 function conciseSummary(event: ExtractedSignal) {
   if (event.sourceType === "Jobs") {
-    return "Monitors ESG-related hiring intent through live job search queries.";
+    return "Live hiring query monitoring ESG capability-building.";
   }
 
   if (event.sourceType === "Patents") {
-    return "Tracks ESG innovation themes through live patent search queries.";
+    return "Live patent query monitoring ESG innovation themes.";
   }
 
   if (event.sourceType === "Reports") {
-    return "Uploaded company disclosure included as supporting evidence.";
+    return "Verified company report included as disclosure evidence.";
   }
 
   if (event.source === "Demo fallback") {
     return "Demo scenario used when live evidence is unavailable.";
   }
 
-  return "Public news signal contributing to market recognition and transformation strength.";
+  return "Public ESG news signal contributing to transformation and recognition scoring.";
 }
 
 function groupEvents(events: ExtractedSignal[]) {
@@ -177,7 +177,7 @@ export function EvidenceTimeline({ events }: EvidenceTimelineProps) {
                   }
                   className="mt-3 rounded-full border border-emerald-100 bg-white/58 px-3 py-1.5 text-sm font-semibold text-[#143b34] transition hover:bg-white/80"
                 >
-                  {isExpanded ? "Show less evidence" : "View more evidence"}
+                  {isExpanded ? "Show less" : "View more"}
                 </button>
               ) : null}
             </motion.div>

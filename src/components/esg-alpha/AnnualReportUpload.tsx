@@ -1,15 +1,20 @@
 "use client";
 
 import { FileText, Upload, X } from "lucide-react";
+import type { ReportVerification } from "@/types/esg";
 
 type AnnualReportUploadProps = {
   fileNames: string[];
+  reportVerifications?: ReportVerification[];
   onFileNamesChange: (fileNames: string[]) => void;
+  selectedCompanyName: string;
 };
 
 export function AnnualReportUpload({
   fileNames,
-  onFileNamesChange
+  reportVerifications = [],
+  onFileNamesChange,
+  selectedCompanyName
 }: AnnualReportUploadProps) {
   function addFiles(files: FileList | null) {
     if (!files) {
@@ -22,6 +27,22 @@ export function AnnualReportUpload({
 
   function removeFile(fileName: string) {
     onFileNamesChange(fileNames.filter((name) => name !== fileName));
+  }
+
+  function verificationFor(fileName: string) {
+    return reportVerifications.find((report) => report.fileName === fileName);
+  }
+
+  function badgeTone(status?: string) {
+    if (status === "verified") {
+      return "border-emerald-200 bg-emerald-100 text-emerald-800";
+    }
+
+    if (status === "mismatch") {
+      return "border-rose-200 bg-rose-100 text-rose-800";
+    }
+
+    return "border-amber-200 bg-amber-100 text-amber-800";
   }
 
   return (
@@ -62,20 +83,37 @@ export function AnnualReportUpload({
           {fileNames.length > 0 ? (
             <div className="flex max-w-xl flex-wrap items-center gap-2">
               {fileNames.map((fileName) => (
-                <span
-                  key={fileName}
-                  className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/70 bg-white/58 px-3 py-1.5 text-sm font-medium text-[#42534d]"
-                  title={fileName}
-                >
-                  <span className="max-w-52 truncate">{fileName}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(fileName)}
-                    className="rounded-full p-0.5 text-[#697772] transition hover:bg-white/80 hover:text-[#143b34]"
-                    aria-label={`Remove ${fileName}`}
+                <span key={fileName} className="flex max-w-full flex-col gap-1">
+                  <span
+                    className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/70 bg-white/58 px-3 py-1.5 text-sm font-medium text-[#42534d]"
+                    title={fileName}
                   >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+                    <span className="max-w-52 truncate">{fileName}</span>
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badgeTone(verificationFor(fileName)?.status)}`}
+                    >
+                      {verificationFor(fileName)?.status === "verified"
+                        ? "Verified"
+                        : verificationFor(fileName)?.status === "mismatch"
+                        ? "Mismatch"
+                        : "Needs review"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(fileName)}
+                      className="rounded-full p-0.5 text-[#697772] transition hover:bg-white/80 hover:text-[#143b34]"
+                      aria-label={`Remove ${fileName}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                  {verificationFor(fileName)?.status === "mismatch" ? (
+                    <span className="max-w-md rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-800">
+                      Selected company is {selectedCompanyName}, but this file
+                      does not appear to match company aliases. Please upload
+                      the correct company report.
+                    </span>
+                  ) : null}
                 </span>
               ))}
               {fileNames.length > 1 ? (

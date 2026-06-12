@@ -14,6 +14,7 @@ import { ScoreMethodologyPanel } from "@/components/esg-alpha/ScoreMethodologyPa
 import { SignalSourcePanel } from "@/components/esg-alpha/SignalSourcePanel";
 import { demoCompanies, type CompanyId } from "@/lib/esg/mockCompanies";
 import { mockResults } from "@/lib/esg/mockResults";
+import { verifyReportFileNames } from "@/lib/esg/reportVerification";
 import type { EsgScanResult, EvidenceImpact, EvidenceSourceType } from "@/types/esg";
 
 function investorActionForClassification(classification: string) {
@@ -124,6 +125,10 @@ export default function Home() {
       demoCompanies[0],
     [selectedCompanyId]
   );
+  const reportVerifications = useMemo(
+    () => verifyReportFileNames(reportFileNames, selectedCompany.name),
+    [reportFileNames, selectedCompany.name]
+  );
 
   function handleSelect(companyId: CompanyId) {
     setSelectedCompanyId(companyId);
@@ -188,7 +193,9 @@ export default function Home() {
 
         <AnnualReportUpload
           fileNames={reportFileNames}
+          reportVerifications={reportVerifications}
           onFileNamesChange={setReportFileNames}
+          selectedCompanyName={selectedCompany.name}
         />
 
         <section className="glass-panel rounded-2xl p-5 sm:p-6">
@@ -216,6 +223,8 @@ export default function Home() {
                 jobSignalsFound={scanResult.jobSignalsFound}
                 reportSignalIncluded={scanResult.reportSignalIncluded}
                 reportSignalsFound={scanResult.reportSignalsFound}
+                verifiedReportsFound={scanResult.verifiedReportsFound}
+                mismatchedReportsFound={scanResult.mismatchedReportsFound}
                 queryUsed={scanResult.queryUsed}
                 generatedAt={scanResult.generatedAt}
               />

@@ -5,6 +5,7 @@ import { getJobSignals } from "@/lib/esg/providers/jobProvider";
 import { scorePartialLiveSignals, scoreSignals } from "@/lib/esg/scoring";
 import { extractSignalsFromArticles } from "@/lib/esg/signalExtraction";
 import { mockResults } from "@/lib/esg/mockResults";
+import { verifyReportFileNames } from "@/lib/esg/reportVerification";
 import type {
   EsgScanResult,
   EvidenceImpact,
@@ -120,8 +121,21 @@ function fallbackScoreBreakdown(fallback: (typeof mockResults)[keyof typeof mock
     marketRecognition: {
       level: fallback.marketRecognition,
       newsArticleCount: 0,
+      recognitionScore: 0,
+      newsVisibilityScore: 0,
+      formalRecognitionScore: 0,
+      institutionalVisibilityScore: 0,
+      sourceReliabilityVisibilityScore: 0,
       explanation:
         "No live ESG news articles were available, so market recognition is inferred from the demo fallback scenario."
+    },
+    recognitionGap: {
+      transformationStrength: fallback.transformationStrength,
+      recognitionScore: 0,
+      gap: fallback.transformationStrength,
+      interpretation: "Transformation signals are ahead of market recognition.",
+      explanation:
+        "Transformation Strength minus Recognition Score. A larger positive gap means transformation may be ahead of market recognition."
     },
     alphaWindow: {
       months: fallback.alphaWindowMonths,
@@ -175,6 +189,12 @@ function fallbackResult(
     jobSignalsFound: 0,
     reportSignalIncluded: false,
     reportSignalsFound: 0,
+    verifiedReportsFound: 0,
+    mismatchedReportsFound: 0,
+    reportVerifications: [],
+    recognitionScore: 0,
+    recognitionGap: fallback.transformationStrength,
+    gapInterpretation: "Transformation signals are ahead of market recognition.",
     queryUsed: debug?.queryUsed ?? "Demo fallback",
     providerUsed: debug?.providerUsed ?? "fallback",
     scoreBreakdown: fallbackScoreBreakdown(fallback),
@@ -384,6 +404,18 @@ export async function POST(request: Request) {
     const companyId = body.companyId?.trim();
     const companyName = body.companyName?.trim();
     const reportFileNames = normaliseReportFileNames(body);
+    const reportVerifications = companyName
+      ? verifyReportFileNames(reportFileNames, companyName)
+      : [];
+    const verifiedReportFileNames = reportVerifications
+      .filter((report) => report.status === "verified")
+      .map((report) => report.fileName);
+    const needsReviewReportCount = reportVerifications.filter(
+      (report) => report.status === "needs_review"
+    ).length;
+    const mismatchedReportCount = reportVerifications.filter(
+      (report) => report.status === "mismatch"
+    ).length;
 
     if (!companyId || !companyName) {
       return NextResponse.json(
@@ -412,7 +444,7 @@ export async function POST(request: Request) {
     const newsCount = liveNews.articles.length;
     const patentCount = patentSignals.length;
     const jobCount = jobSignals.length;
-    const hasReportSignal = reportFileNames.length > 0;
+    const hasReportSignal = verifiedReportFileNames.length > 0 || needsReviewReportCount > 0;
     const { dataMode, providerUsed } = resolveScanMode({
       newsCount,
       patentCount,
@@ -442,7 +474,8 @@ export async function POST(request: Request) {
         companyName,
         patentSignalCount: patentCount,
         jobSignalCount: jobCount,
-        reportSignalCount: reportFileNames.length,
+        reportSignalCount: verifiedReportFileNames.length,
+        needsReviewReportCount,
         hasReportSignal
       });
 
@@ -451,17 +484,20 @@ export async function POST(request: Request) {
       partialResult.patentSignalsFound = patentCount;
       partialResult.jobSignalsFound = jobCount;
       partialResult.reportSignalIncluded = hasReportSignal;
-      partialResult.reportSignalsFound = reportFileNames.length;
+      partialResult.reportSignalsFound = verifiedReportFileNames.length;
+      partialResult.verifiedReportsFound = verifiedReportFileNames.length;
+      partialResult.mismatchedReportsFound = mismatchedReportCount;
+      partialResult.reportVerifications = reportVerifications;
       partialResult.queryUsed =
         patentCount > 0
           ? "Google Patents ESG innovation queries"
           : jobCount > 0
           ? "Google Jobs ESG hiring queries"
-          : reportFileNames.join(", ") || "Uploaded report";
+          : verifiedReportFileNames.join(", ") || "Uploaded report";
 
       const responseResult = withUploadedReportSignal(
         withJobSignals(withPatentSignals(partialResult, patentSignals), jobSignals),
-        reportFileNames
+        verifiedReportFileNames
       );
 
       console.log("[API] Returning response", {
@@ -479,7 +515,8 @@ export async function POST(request: Request) {
       signals,
       patentSignalCount: patentCount,
       jobSignalCount: jobCount,
-      reportSignalCount: reportFileNames.length,
+      reportSignalCount: verifiedReportFileNames.length,
+      needsReviewReportCount,
       hasAdditionalSource: patentCount > 0 || jobCount > 0 || hasReportSignal
     });
 
@@ -487,7 +524,10 @@ export async function POST(request: Request) {
     liveResult.patentSignalsFound = patentCount;
     liveResult.jobSignalsFound = jobCount;
     liveResult.reportSignalIncluded = hasReportSignal;
-    liveResult.reportSignalsFound = reportFileNames.length;
+    liveResult.reportSignalsFound = verifiedReportFileNames.length;
+    liveResult.verifiedReportsFound = verifiedReportFileNames.length;
+    liveResult.mismatchedReportsFound = mismatchedReportCount;
+    liveResult.reportVerifications = reportVerifications;
     liveResult.queryUsed = liveNews.queryUsed;
     liveResult.providerUsed = providerUsed;
     liveResult.investorAction =
@@ -495,7 +535,7 @@ export async function POST(request: Request) {
       liveResult.investorAction;
     const responseResult = withUploadedReportSignal(
       withJobSignals(withPatentSignals(liveResult, patentSignals), jobSignals),
-      reportFileNames
+      verifiedReportFileNames
     );
 
     console.log("[API] Returning response", {

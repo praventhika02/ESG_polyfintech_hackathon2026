@@ -20,6 +20,8 @@ type SignalSourcePanelProps = {
   jobSignalsFound?: number;
   reportSignalIncluded?: boolean;
   reportSignalsFound?: number;
+  verifiedReportsFound?: number;
+  mismatchedReportsFound?: number;
   queryUsed?: string;
   generatedAt: string;
 };
@@ -122,18 +124,20 @@ export function SignalSourcePanel({
   jobSignalsFound = 0,
   reportSignalIncluded = false,
   reportSignalsFound,
+  verifiedReportsFound,
+  mismatchedReportsFound = 0,
   queryUsed,
   generatedAt
 }: SignalSourcePanelProps) {
-  const reportCount = reportSignalsFound ?? (reportSignalIncluded ? 1 : 0);
+  const reportCount = verifiedReportsFound ?? reportSignalsFound ?? (reportSignalIncluded ? 1 : 0);
   const mode = modeDisplay[dataMode];
   const newsStatus = sourceStatus(articlesFound > 0);
   const patentStatus = sourceStatus(patentSignalsFound > 0);
   const jobStatus = sourceStatus(jobSignalsFound > 0);
   const reportStatus = sourceStatus(
     reportCount > 0,
-    "Included",
-    "Optional"
+    mismatchedReportsFound > 0 ? "Verified + mismatch" : "Verified",
+    mismatchedReportsFound > 0 ? "Mismatch" : "Optional"
   );
   const sources = [
     {
@@ -163,7 +167,10 @@ export function SignalSourcePanel({
     {
       title: "Report Signal",
       count: reportCount,
-      label: "Uploaded report signals",
+      label:
+        mismatchedReportsFound > 0
+          ? `${mismatchedReportsFound} mismatched`
+          : "Verified report signals",
       icon: FileText,
       status: reportStatus,
       accent: "text-amber-700"
@@ -291,6 +298,7 @@ export function SignalSourcePanel({
                 reportSignalIncluded: {reportSignalIncluded ? "true" : "false"}
               </span>
               <span>reportSignalsFound: {reportCount}</span>
+              <span>mismatchedReportsFound: {mismatchedReportsFound}</span>
               <span className="truncate">queryUsed: {queryUsed ?? "n/a"}</span>
             </div>
           </details>

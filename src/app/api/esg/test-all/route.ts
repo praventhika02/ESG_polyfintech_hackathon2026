@@ -58,6 +58,14 @@ function resolveProvider({
   return { dataMode: "fallback", providerUsed: "fallback" };
 }
 
+function investorDecision(classification: EsgScanResult["classification"]) {
+  if (classification === "Early Alpha Opportunity") return "Act Early";
+  if (classification === "Emerging ESG Improver") return "Monitor Closely";
+  if (classification === "Already Recognised") return "Already Priced In";
+  if (classification === "Innovation Watchlist") return "Wait for Confirmation";
+  return "Avoid for Now";
+}
+
 async function testCompany(company: (typeof demoCompanies)[number]) {
   const [newsResult, patentSignals, jobSignals] = await Promise.all([
     withTimeout(fetchLiveEsgNews(company.name), 12000).catch(() => ({
@@ -80,6 +88,12 @@ async function testCompany(company: (typeof demoCompanies)[number]) {
   });
 
   let classification: EsgScanResult["classification"] = "Watchlist";
+  let recognitionScore = 0;
+  let recognitionGap = 0;
+  let transformationStrength = 0;
+  let confidence = 0;
+  let marketRecognition: EsgScanResult["marketRecognition"] = "Low";
+  let alphaWindowMonths = 0;
   let evidenceCount = 0;
 
   if (dataMode === "live") {
@@ -92,6 +106,12 @@ async function testCompany(company: (typeof demoCompanies)[number]) {
       hasAdditionalSource: patentCount > 0 || jobCount > 0
     });
     classification = result.classification;
+    transformationStrength = result.transformationStrength;
+    confidence = result.confidence;
+    recognitionScore = result.recognitionScore ?? 0;
+    recognitionGap = result.recognitionGap ?? 0;
+    marketRecognition = result.marketRecognition;
+    alphaWindowMonths = result.alphaWindowMonths;
     evidenceCount =
       result.evidenceTimeline.length +
       Math.min(3, patentCount) +
@@ -105,6 +125,12 @@ async function testCompany(company: (typeof demoCompanies)[number]) {
       hasReportSignal: false
     });
     classification = result.classification;
+    transformationStrength = result.transformationStrength;
+    confidence = result.confidence;
+    recognitionScore = result.recognitionScore ?? 0;
+    recognitionGap = result.recognitionGap ?? 0;
+    marketRecognition = result.marketRecognition;
+    alphaWindowMonths = result.alphaWindowMonths;
     evidenceCount = Math.min(3, patentCount) + Math.min(3, jobCount);
   }
 
@@ -116,8 +142,15 @@ async function testCompany(company: (typeof demoCompanies)[number]) {
     articlesFound: newsResult.articlesFound,
     patentSignalsFound: patentCount,
     jobSignalsFound: jobCount,
-    evidenceCount,
-    classification
+    transformationStrength,
+    recognitionScore,
+    recognitionGap,
+    confidence,
+    marketRecognition,
+    classification,
+    investorDecision: investorDecision(classification),
+    alphaWindowMonths,
+    evidenceCount
   };
 }
 
