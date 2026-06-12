@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { fetchLiveEsgNews } from "@/lib/esg/providers/newsProvider";
 import { getPatentSignals } from "@/lib/esg/providers/patentProvider";
-import { scoreSignals } from "@/lib/esg/scoring";
+import { scorePartialLiveSignals, scoreSignals } from "@/lib/esg/scoring";
 import { extractSignalsFromArticles } from "@/lib/esg/signalExtraction";
 import { mockResults } from "@/lib/esg/mockResults";
-import type { EsgScanResult, EvidenceImpact, EvidenceSourceType } from "@/types/esg";
+import type {
+  EsgScanResult,
+  EvidenceImpact,
+  EvidenceSourceType,
+  ProviderUsed
+} from "@/types/esg";
 
 type ScanRequest = {
   companyId?: string;
@@ -62,6 +67,8 @@ function normaliseSourceType(sourceType: string): EvidenceSourceType {
   if (
     sourceType === "News" ||
     sourceType === "Jobs" ||
+    sourceType === "Patents" ||
+    sourceType === "Reports" ||
     sourceType === "Recognition" ||
     sourceType === "Filings" ||
     sourceType === "Policy"
@@ -113,9 +120,44 @@ function fallbackResult(
     })),
     articlesFound: debug?.articlesFound ?? 0,
     patentSignalsFound: 0,
+    reportSignalIncluded: false,
     queryUsed: debug?.queryUsed ?? "Demo fallback",
     providerUsed: debug?.providerUsed ?? "fallback"
   };
+}
+
+function resolveScanMode({
+  newsCount,
+  patentCount,
+  hasReportSignal,
+  newsProvider
+}: {
+  newsCount: number;
+  patentCount: number;
+  hasReportSignal: boolean;
+  newsProvider: ProviderUsed;
+}): Pick<EsgScanResult, "dataMode" | "providerUsed"> {
+  if (newsCount > 0 && patentCount > 0) {
+    return { dataMode: "live", providerUsed: "mixed_live" };
+  }
+
+  if (newsCount > 0) {
+    return { dataMode: "live", providerUsed: newsProvider };
+  }
+
+  if (patentCount > 0 && hasReportSignal) {
+    return { dataMode: "partial_live", providerUsed: "mixed_live" };
+  }
+
+  if (patentCount > 0) {
+    return { dataMode: "partial_live", providerUsed: "patents_only" };
+  }
+
+  if (hasReportSignal) {
+    return { dataMode: "partial_live", providerUsed: "report_only" };
+  }
+
+  return { dataMode: "fallback", providerUsed: "fallback" };
 }
 
 function patentSignalsToEvidence(
@@ -165,11 +207,15 @@ function withUploadedReportSignal(
   reportFileName?: string
 ): EsgScanResult {
   if (!reportFileName) {
-    return result;
+    return {
+      ...result,
+      reportSignalIncluded: false
+    };
   }
 
   return {
     ...result,
+    reportSignalIncluded: true,
     evidenceTimeline: [
       {
         date: "Uploaded",
@@ -220,22 +266,59 @@ export async function POST(request: Request) {
       })
     ]);
 
-    if (liveNews.articles.length === 0) {
-      const fallback = withPatentSignals(
-        fallbackResult(companyId, companyName, {
-          articlesFound: liveNews.articlesFound,
-          queryUsed: liveNews.queryUsed,
-          providerUsed: "fallback"
-        }),
-        patentSignals
-      );
+    const newsCount = liveNews.articles.length;
+    const patentCount = patentSignals.length;
+    const hasReportSignal = Boolean(reportFileName);
+    const { dataMode, providerUsed } = resolveScanMode({
+      newsCount,
+      patentCount,
+      hasReportSignal,
+      newsProvider: liveNews.providerUsed
+    });
+
+    if (dataMode === "fallback") {
+      const fallback = fallbackResult(companyId, companyName, {
+        articlesFound: liveNews.articlesFound,
+        queryUsed: liveNews.queryUsed,
+        providerUsed
+      });
 
       console.log("[API] Returning response", {
         dataMode: fallback.dataMode,
         evidenceCount: fallback.evidenceTimeline.length
       });
 
-      return NextResponse.json(withUploadedReportSignal(fallback, reportFileName));
+      return NextResponse.json(fallback);
+    }
+
+    if (dataMode === "partial_live") {
+      const partialResult = scorePartialLiveSignals({
+        companyId,
+        companyName,
+        patentSignalCount: patentCount,
+        hasReportSignal
+      });
+
+      partialResult.providerUsed = providerUsed;
+      partialResult.articlesFound = liveNews.articlesFound;
+      partialResult.patentSignalsFound = patentCount;
+      partialResult.reportSignalIncluded = hasReportSignal;
+      partialResult.queryUsed =
+        patentCount > 0
+          ? "Google Patents ESG innovation queries"
+          : reportFileName ?? "Uploaded report";
+
+      const responseResult = withUploadedReportSignal(
+        withPatentSignals(partialResult, patentSignals),
+        reportFileName
+      );
+
+      console.log("[API] Returning response", {
+        dataMode: responseResult.dataMode,
+        evidenceCount: responseResult.evidenceTimeline.length
+      });
+
+      return NextResponse.json(responseResult);
     }
 
     const signals = extractSignalsFromArticles(liveNews.articles);
@@ -243,13 +326,15 @@ export async function POST(request: Request) {
       companyId,
       companyName,
       signals,
-      patentSignalCount: patentSignals.length
+      patentSignalCount: patentCount,
+      hasAdditionalSource: patentCount > 0 || hasReportSignal
     });
 
     liveResult.articlesFound = liveNews.articlesFound;
-    liveResult.patentSignalsFound = patentSignals.length;
+    liveResult.patentSignalsFound = patentCount;
+    liveResult.reportSignalIncluded = hasReportSignal;
     liveResult.queryUsed = liveNews.queryUsed;
-    liveResult.providerUsed = liveNews.providerUsed;
+    liveResult.providerUsed = providerUsed;
     liveResult.investorAction =
       investorActionForClassification(liveResult.classification) ??
       liveResult.investorAction;

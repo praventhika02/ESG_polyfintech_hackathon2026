@@ -4,11 +4,19 @@ export type Classification =
   | "Early Alpha Opportunity"
   | "Emerging ESG Improver"
   | "Already Recognised"
-  | "Watchlist";
+  | "Watchlist"
+  | "Innovation Watchlist"
+  | "Evidence Watchlist";
 
-export type DataMode = "live" | "fallback";
+export type DataMode = "live" | "partial_live" | "fallback";
 
-export type ProviderUsed = "gdelt" | "google_news_rss" | "fallback";
+export type ProviderUsed =
+  | "gdelt"
+  | "google_news_rss"
+  | "patents_only"
+  | "report_only"
+  | "mixed_live"
+  | "fallback";
 
 export type EvidenceSourceType =
   | "News"
@@ -61,6 +69,7 @@ export type EsgScanResult = {
   evidenceTimeline: ExtractedSignal[];
   articlesFound?: number;
   patentSignalsFound?: number;
+  reportSignalIncluded?: boolean;
   queryUsed?: string;
   providerUsed?: ProviderUsed;
 };

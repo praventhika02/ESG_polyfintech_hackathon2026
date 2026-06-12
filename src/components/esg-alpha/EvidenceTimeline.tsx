@@ -38,6 +38,22 @@ const reliabilityTone = {
   Low: "bg-slate-100 text-slate-700 border-slate-200"
 };
 
+function sourceStatus(event: ExtractedSignal) {
+  if (event.sourceType === "Patents") {
+    return "Live patent search";
+  }
+
+  if (event.sourceType === "Reports") {
+    return "Uploaded report";
+  }
+
+  if (event.source === "Demo fallback") {
+    return "Demo scenario";
+  }
+
+  return event.source;
+}
+
 export function EvidenceTimeline({ events }: EvidenceTimelineProps) {
   return (
     <section className="glass-panel rounded-2xl p-5 sm:p-6">
@@ -103,11 +119,9 @@ export function EvidenceTimeline({ events }: EvidenceTimelineProps) {
                   <span className="rounded-full border border-white/70 bg-white/58 px-2.5 py-1 text-xs font-medium text-[#596662]">
                     Signal score {event.signalScore}
                   </span>
-                  {event.sourceType === "Patents" ? (
-                    <span className="rounded-full border border-indigo-200 bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-800">
-                      Live search
-                    </span>
-                  ) : null}
+                  <span className="rounded-full border border-indigo-200 bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-800">
+                    {sourceStatus(event)}
+                  </span>
                   <span
                     className={`rounded-full border px-2.5 py-1 text-xs font-medium ${reliabilityTone[event.sourceReliability]}`}
                   >

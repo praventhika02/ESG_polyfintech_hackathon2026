@@ -35,6 +35,8 @@ function normaliseSourceType(sourceType: string): EvidenceSourceType {
   if (
     sourceType === "News" ||
     sourceType === "Jobs" ||
+    sourceType === "Patents" ||
+    sourceType === "Reports" ||
     sourceType === "Recognition" ||
     sourceType === "Filings" ||
     sourceType === "Policy"
@@ -87,6 +89,7 @@ function demoFallbackResult(companyId: CompanyId, companyName: string): EsgScanR
     })),
     articlesFound: 0,
     patentSignalsFound: 0,
+    reportSignalIncluded: false,
     queryUsed: "Client fallback",
     providerUsed: "fallback"
   };
@@ -192,7 +195,7 @@ export default function Home() {
               <ResultSummary company={selectedCompany} result={scanResult} />
               {process.env.NODE_ENV === "development" ? (
                 <section className="glass-panel rounded-2xl p-4">
-                  <div className="grid gap-3 text-sm text-[#42534d] sm:grid-cols-6">
+                  <div className="grid gap-3 text-sm text-[#42534d] sm:grid-cols-2 lg:grid-cols-7">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900/60">
                         providerUsed
@@ -221,6 +224,14 @@ export default function Home() {
                       </p>
                       <p className="mt-1 font-mono">
                         {scanResult.patentSignalsFound ?? 0}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900/60">
+                        reportSignalIncluded
+                      </p>
+                      <p className="mt-1 font-mono">
+                        {scanResult.reportSignalIncluded ? "true" : "false"}
                       </p>
                     </div>
                     <div className="sm:col-span-1">

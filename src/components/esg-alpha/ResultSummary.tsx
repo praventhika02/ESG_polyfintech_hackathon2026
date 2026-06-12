@@ -16,9 +16,27 @@ const recognitionTone = {
   High: "bg-emerald-100 text-emerald-800 border-emerald-200"
 };
 
+const dataModeCopy = {
+  live: {
+    label: "Live data scan",
+    tone: "border-teal-200 bg-teal-100 text-teal-800",
+    message: "Gap score generated from live ESG signals."
+  },
+  partial_live: {
+    label: "Partial live scan",
+    tone: "border-blue-200 bg-blue-100 text-blue-800",
+    message:
+      "Gap score generated from available live patent/report signals; news coverage was unavailable."
+  },
+  fallback: {
+    label: "Demo fallback",
+    tone: "border-amber-200 bg-amber-100 text-amber-800",
+    message: "Using demo fallback data because live signals are unavailable."
+  }
+};
+
 export function ResultSummary({ company, result }: ResultSummaryProps) {
-  const dataModeLabel =
-    result.dataMode === "live" ? "Live data scan" : "Demo fallback";
+  const mode = dataModeCopy[result.dataMode];
   const metrics = [
     {
       label: "Transformation Strength",
@@ -64,13 +82,11 @@ export function ResultSummary({ company, result }: ResultSummaryProps) {
             </span>
             <span
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium ${
-                result.dataMode === "live"
-                  ? "border-teal-200 bg-teal-100 text-teal-800"
-                  : "border-amber-200 bg-amber-100 text-amber-800"
+                mode.tone
               }`}
             >
               <DatabaseZap className="h-3.5 w-3.5" />
-              {dataModeLabel}
+              {mode.label}
             </span>
             <span
               className={`rounded-full border px-3 py-1.5 text-sm font-medium ${recognitionTone[result.marketRecognition]}`}
@@ -81,9 +97,7 @@ export function ResultSummary({ company, result }: ResultSummaryProps) {
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-white/70 bg-white/50 px-4 py-3 text-sm font-medium text-[#38524b]">
           <LineChart className="h-4 w-4 text-emerald-700" />
-          {result.dataMode === "live"
-            ? "Gap score generated from live ESG news signals"
-            : "Using demo fallback data because live signals are unavailable"}
+          {mode.message}
         </div>
       </div>
 

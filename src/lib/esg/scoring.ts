@@ -81,6 +81,10 @@ function investorActionFor(classification: Classification) {
       return "ESG signals are strong, but public recognition is already high. This may be less attractive for early-alpha entry, though still relevant for ESG quality screening.";
     case "Watchlist":
       return "Current live signals are not strong enough for action. Keep on watchlist until stronger ESG evidence emerges.";
+    case "Innovation Watchlist":
+      return "Live patent intelligence is monitoring ESG innovation themes, but news confirmation is not yet broad enough for an early-alpha call.";
+    case "Evidence Watchlist":
+      return "Available live evidence is useful for monitoring, but investors should wait for stronger multi-source confirmation before acting.";
   }
 }
 
@@ -137,12 +141,14 @@ export function scoreSignals({
   companyId,
   companyName,
   signals,
-  patentSignalCount = 0
+  patentSignalCount = 0,
+  hasAdditionalSource = false
 }: {
   companyId: string;
   companyName: string;
   signals: ExtractedSignal[];
   patentSignalCount?: number;
+  hasAdditionalSource?: boolean;
 }): EsgScanResult {
   const relevantSignals = signals;
   const positiveSignals = relevantSignals.filter(
@@ -197,7 +203,14 @@ export function scoreSignals({
     transformationStrength,
     marketRecognition
   );
-  const classification = classify(transformationStrength, marketRecognition);
+  let classification = classify(transformationStrength, marketRecognition);
+
+  if (
+    classification === "Early Alpha Opportunity" &&
+    !hasAdditionalSource
+  ) {
+    classification = "Emerging ESG Improver";
+  }
 
   return {
     companyId,
@@ -218,5 +231,58 @@ export function scoreSignals({
     evidenceTimeline: relevantSignals
       .sort((a, b) => b.signalScore - a.signalScore)
       .slice(0, 4)
+  };
+}
+
+export function scorePartialLiveSignals({
+  companyId,
+  companyName,
+  patentSignalCount,
+  hasReportSignal
+}: {
+  companyId: string;
+  companyName: string;
+  patentSignalCount: number;
+  hasReportSignal: boolean;
+}): EsgScanResult {
+  const patentBoost = transformationBoostFromPatents(patentSignalCount);
+  const transformationStrength = clamp(
+    58 + patentSignalCount * 5 + patentBoost + (hasReportSignal ? 6 : 0),
+    60,
+    80
+  );
+  const confidenceCap = hasReportSignal ? 88 : 82;
+  const confidence = clamp(
+    54 + patentSignalCount * 7 + (hasReportSignal ? 8 : 0),
+    55,
+    confidenceCap
+  );
+  const classification: Classification =
+    patentSignalCount > 0 && !hasReportSignal
+      ? "Innovation Watchlist"
+      : "Evidence Watchlist";
+  const whyNow = [
+    patentSignalCount >= 3
+      ? "Patent intelligence layer is monitoring multiple ESG innovation themes for this company."
+      : "Live ESG evidence is available, but news coverage was unavailable during this scan.",
+    hasReportSignal
+      ? "Uploaded report evidence has been included as a high-reliability source for the next parsing module."
+      : "Market recognition appears low because live news volume was unavailable.",
+    "The alpha window remains open for monitoring while stronger news confirmation develops."
+  ];
+
+  return {
+    companyId,
+    companyName,
+    generatedAt: new Date().toISOString(),
+    dataMode: "partial_live",
+    transformationStrength,
+    marketRecognition: "Low",
+    confidence,
+    alphaWindowMonths: patentSignalCount >= 3 ? 10 : 8,
+    classification,
+    investorAction: investorActionFor(classification),
+    whyNow,
+    evidenceTimeline: []
   };
 }
