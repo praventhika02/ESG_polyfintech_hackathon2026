@@ -102,3 +102,5 @@ export const mockCompanies: MockCompany[] = [
     icon: Factory
   }
 ];
+
+export const demoCompanies = mockCompanies;

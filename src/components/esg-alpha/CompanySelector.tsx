@@ -31,7 +31,7 @@ export function CompanySelector({
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
         {companies.map((company, index) => {
           const Icon = company.icon;
           const isSelected = company.id === selectedCompanyId;
@@ -46,7 +46,7 @@ export function CompanySelector({
                   ? "border-emerald-500/70 bg-emerald-50/80 shadow-[0_16px_44px_rgba(16,120,96,0.18)]"
                   : "border-white/65 bg-white/42 hover:border-emerald-500/40 hover:bg-white/64"
               }`}
-              initial={{ opacity: 0, y: 14 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.045, duration: 0.42 }}
               whileHover={{ y: -3 }}

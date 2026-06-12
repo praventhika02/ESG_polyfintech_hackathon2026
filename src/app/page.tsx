@@ -10,7 +10,7 @@ import { ResultSummary } from "@/components/esg-alpha/ResultSummary";
 import { ScanButton } from "@/components/esg-alpha/ScanButton";
 import { ScanningPanel } from "@/components/esg-alpha/ScanningPanel";
 import { TimeDisplay } from "@/components/esg-alpha/TimeDisplay";
-import { mockCompanies, type CompanyId } from "@/lib/esg/mockCompanies";
+import { demoCompanies, type CompanyId } from "@/lib/esg/mockCompanies";
 import { mockResults } from "@/lib/esg/mockResults";
 import type { EsgScanResult, EvidenceImpact, EvidenceSourceType } from "@/types/esg";
 
@@ -76,14 +76,16 @@ function demoFallbackResult(companyId: CompanyId, companyName: string): EsgScanR
 }
 
 export default function Home() {
+  console.log("[UI] demoCompanies count:", demoCompanies.length);
+
   const [selectedCompanyId, setSelectedCompanyId] = useState<CompanyId>("sembcorp");
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<EsgScanResult | null>(null);
 
   const selectedCompany = useMemo(
     () =>
-      mockCompanies.find((company) => company.id === selectedCompanyId) ??
-      mockCompanies[0],
+      demoCompanies.find((company) => company.id === selectedCompanyId) ??
+      demoCompanies[0],
     [selectedCompanyId]
   );
 
@@ -142,7 +144,7 @@ export default function Home() {
         <HeroSection />
 
         <CompanySelector
-          companies={mockCompanies}
+          companies={demoCompanies}
           selectedCompanyId={selectedCompany.id}
           onSelect={handleSelect}
         />
