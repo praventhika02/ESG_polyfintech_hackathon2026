@@ -2,10 +2,10 @@
 
 import { motion } from "framer-motion";
 import { ArrowUpRight, CheckCircle2, Target } from "lucide-react";
-import type { MockResult } from "@/lib/esg/mockResults";
+import type { EsgScanResult } from "@/types/esg";
 
 type InvestorActionCardProps = {
-  result: MockResult;
+  result: EsgScanResult;
 };
 
 export function InvestorActionCard({ result }: InvestorActionCardProps) {

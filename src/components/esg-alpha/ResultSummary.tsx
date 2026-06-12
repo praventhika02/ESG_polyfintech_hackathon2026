@@ -1,13 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Gauge, Hourglass, LineChart, ShieldCheck } from "lucide-react";
+import { DatabaseZap, Gauge, Hourglass, LineChart, ShieldCheck } from "lucide-react";
 import type { MockCompany } from "@/lib/esg/mockCompanies";
-import type { MockResult } from "@/lib/esg/mockResults";
+import type { EsgScanResult } from "@/types/esg";
 
 type ResultSummaryProps = {
   company: MockCompany;
-  result: MockResult;
+  result: EsgScanResult;
 };
 
 const recognitionTone = {
@@ -17,6 +17,8 @@ const recognitionTone = {
 };
 
 export function ResultSummary({ company, result }: ResultSummaryProps) {
+  const dataModeLabel =
+    result.dataMode === "live" ? "Live data scan" : "Demo fallback";
   const metrics = [
     {
       label: "Transformation Strength",
@@ -61,6 +63,16 @@ export function ResultSummary({ company, result }: ResultSummaryProps) {
               {result.classification}
             </span>
             <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium ${
+                result.dataMode === "live"
+                  ? "border-teal-200 bg-teal-100 text-teal-800"
+                  : "border-amber-200 bg-amber-100 text-amber-800"
+              }`}
+            >
+              <DatabaseZap className="h-3.5 w-3.5" />
+              {dataModeLabel}
+            </span>
+            <span
               className={`rounded-full border px-3 py-1.5 text-sm font-medium ${recognitionTone[result.marketRecognition]}`}
             >
               Recognition: {result.marketRecognition}
@@ -69,7 +81,9 @@ export function ResultSummary({ company, result }: ResultSummaryProps) {
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-white/70 bg-white/50 px-4 py-3 text-sm font-medium text-[#38524b]">
           <LineChart className="h-4 w-4 text-emerald-700" />
-          Gap score generated from mock multi-source agreement
+          {result.dataMode === "live"
+            ? "Gap score generated from live ESG news signals"
+            : "Using demo fallback data because live signals are unavailable"}
         </div>
       </div>
 

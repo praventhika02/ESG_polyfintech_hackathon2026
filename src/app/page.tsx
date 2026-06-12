@@ -11,11 +11,79 @@ import { ScanButton } from "@/components/esg-alpha/ScanButton";
 import { ScanningPanel } from "@/components/esg-alpha/ScanningPanel";
 import { mockCompanies, type CompanyId } from "@/lib/esg/mockCompanies";
 import { mockResults } from "@/lib/esg/mockResults";
+import type { EsgScanResult, EvidenceImpact, EvidenceSourceType } from "@/types/esg";
+
+function normaliseSourceType(sourceType: string): EvidenceSourceType {
+  if (sourceType === "Report") {
+    return "Reports";
+  }
+
+  if (
+    sourceType === "News" ||
+    sourceType === "Jobs" ||
+    sourceType === "Recognition" ||
+    sourceType === "Filings" ||
+    sourceType === "Policy"
+  ) {
+    return sourceType;
+  }
+
+  return "News";
+}
+
+function impactFromText(text: string): EvidenceImpact {
+  const lowered = text.toLowerCase();
+
+  if (lowered.includes("risk") || lowered.includes("limited")) {
+    return "Neutral";
+  }
+
+  return "Positive";
+}
+
+function demoFallbackResult(companyId: CompanyId, companyName: string): EsgScanResult {
+  const fallback = mockResults[companyId];
+
+  return {
+    companyId,
+    companyName,
+    generatedAt: new Date().toISOString(),
+    dataMode: "fallback",
+    transformationStrength: fallback.transformationStrength,
+    marketRecognition: fallback.marketRecognition,
+    confidence: fallback.confidence,
+    alphaWindowMonths: fallback.alphaWindowMonths,
+    classification: fallback.classification,
+    investorAction: fallback.investorAction,
+    whyNow: fallback.whyNow,
+    evidenceTimeline: fallback.evidenceTimeline.map((event, index) => ({
+      date: event.date,
+      sourceType: normaliseSourceType(event.sourceType),
+      title: event.title,
+      summary: event.impact,
+      url: "",
+      impact: impactFromText(event.impact),
+      signalScore: Math.max(12, fallback.transformationStrength - 55 - index * 2),
+      positiveKeywordCount: 1,
+      negativeKeywordCount: 0,
+      source: "Demo fallback"
+    }))
+  };
+}
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
+}
 
 export default function Home() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<CompanyId>("sembcorp");
   const [isScanning, setIsScanning] = useState(false);
   const [hasResult, setHasResult] = useState(true);
+  const [scanResult, setScanResult] = useState<EsgScanResult>(() =>
+    demoFallbackResult("sembcorp", "Sembcorp Industries")
+  );
 
   const selectedCompany = useMemo(
     () =>
@@ -24,21 +92,43 @@ export default function Home() {
     [selectedCompanyId]
   );
 
-  const selectedResult = mockResults[selectedCompany.id];
-
   function handleSelect(companyId: CompanyId) {
     setSelectedCompanyId(companyId);
     setHasResult(false);
   }
 
-  function handleRunScan() {
+  async function handleRunScan() {
     setIsScanning(true);
     setHasResult(false);
 
-    window.setTimeout(() => {
+    try {
+      const [response] = await Promise.all([
+        fetch("/api/esg/scan", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            companyId: selectedCompany.id,
+            companyName: selectedCompany.name
+          })
+        }),
+        wait(1800)
+      ]);
+
+      if (!response.ok) {
+        throw new Error(`Scan request failed with ${response.status}`);
+      }
+
+      const result = (await response.json()) as EsgScanResult;
+      setScanResult(result);
+    } catch (error) {
+      console.error("Client ESG scan failed", error);
+      setScanResult(demoFallbackResult(selectedCompany.id, selectedCompany.name));
+    } finally {
       setIsScanning(false);
       setHasResult(true);
-    }, 2000);
+    }
   }
 
   return (
@@ -68,10 +158,10 @@ export default function Home() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
             >
-              <ResultSummary company={selectedCompany} result={selectedResult} />
+              <ResultSummary company={selectedCompany} result={scanResult} />
               <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
-                <InvestorActionCard result={selectedResult} />
-                <EvidenceTimeline events={selectedResult.evidenceTimeline} />
+                <InvestorActionCard result={scanResult} />
+                <EvidenceTimeline events={scanResult.evidenceTimeline} />
               </div>
             </motion.div>
           ) : (

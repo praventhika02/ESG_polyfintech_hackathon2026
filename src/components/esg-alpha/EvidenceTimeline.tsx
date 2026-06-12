@@ -1,20 +1,35 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { BriefcaseBusiness, FileText, Newspaper, Radio, Sparkles } from "lucide-react";
-import type { EvidenceEvent } from "@/lib/esg/mockResults";
+import {
+  BriefcaseBusiness,
+  ExternalLink,
+  FileText,
+  FlaskConical,
+  Newspaper,
+  Radio,
+  Sparkles
+} from "lucide-react";
+import type { ExtractedSignal } from "@/types/esg";
 
 type EvidenceTimelineProps = {
-  events: EvidenceEvent[];
+  events: ExtractedSignal[];
 };
 
 const sourceIcons = {
   Jobs: BriefcaseBusiness,
   News: Newspaper,
-  Report: FileText,
+  Reports: FileText,
   Recognition: Radio,
   Filings: FileText,
-  Policy: Sparkles
+  Policy: Sparkles,
+  Patents: FlaskConical
+};
+
+const impactTone = {
+  Positive: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  Neutral: "bg-slate-100 text-slate-700 border-slate-200",
+  Negative: "bg-rose-100 text-rose-800 border-rose-200"
 };
 
 export function EvidenceTimeline({ events }: EvidenceTimelineProps) {
@@ -55,12 +70,34 @@ export function EvidenceTimeline({ events }: EvidenceTimelineProps) {
                 </div>
               </div>
               <div>
-                <h3 className="text-base font-semibold text-[#17211e]">
-                  {event.title}
-                </h3>
+                {event.url ? (
+                  <a
+                    href={event.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-start gap-2 text-base font-semibold text-[#17211e] transition hover:text-emerald-800"
+                  >
+                    <span>{event.title}</span>
+                    <ExternalLink className="mt-1 h-3.5 w-3.5 shrink-0" />
+                  </a>
+                ) : (
+                  <h3 className="text-base font-semibold text-[#17211e]">
+                    {event.title}
+                  </h3>
+                )}
                 <p className="mt-1 text-sm leading-6 text-[#596662]">
-                  {event.impact}
+                  {event.summary}
                 </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-xs font-medium ${impactTone[event.impact]}`}
+                  >
+                    {event.impact}
+                  </span>
+                  <span className="rounded-full border border-white/70 bg-white/58 px-2.5 py-1 text-xs font-medium text-[#596662]">
+                    Signal score {event.signalScore}
+                  </span>
+                </div>
               </div>
             </motion.div>
           );

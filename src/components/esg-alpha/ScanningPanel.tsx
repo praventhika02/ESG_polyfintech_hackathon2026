@@ -9,10 +9,10 @@ type ScanningPanelProps = {
 };
 
 const scanSteps = [
-  "Parsing transition language",
-  "Cross-checking evidence sources",
-  "Measuring recognition lag",
-  "Estimating alpha window"
+  "Scanning live ESG news...",
+  "Extracting transformation signals...",
+  "Estimating alpha window...",
+  "Generating investor action..."
 ];
 
 export function ScanningPanel({ company }: ScanningPanelProps) {

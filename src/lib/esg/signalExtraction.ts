@@ -1,0 +1,93 @@
+import type { ExtractedSignal, NewsArticle } from "@/types/esg";
+
+const positiveKeywords = [
+  "renewable",
+  "solar",
+  "wind",
+  "decarbonisation",
+  "decarbonization",
+  "net zero",
+  "climate",
+  "sustainability",
+  "green finance",
+  "transition",
+  "emissions reduction",
+  "carbon capture",
+  "circular economy",
+  "energy efficiency",
+  "sustainable aviation",
+  "clean energy",
+  "biodiversity",
+  "governance improvement"
+];
+
+const negativeKeywords = [
+  "pollution",
+  "fine",
+  "lawsuit",
+  "labour violation",
+  "labor violation",
+  "corruption",
+  "investigation",
+  "emissions scandal",
+  "deforestation",
+  "greenwashing",
+  "safety breach",
+  "strike"
+];
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function countKeywordMatches(text: string, keywords: string[]) {
+  const normalisedText = text.toLowerCase();
+
+  return keywords.reduce((total, keyword) => {
+    const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const matches = normalisedText.match(new RegExp(`\\b${escapedKeyword}\\b`, "g"));
+
+    return total + (matches?.length ?? 0);
+  }, 0);
+}
+
+function formatArticleDate(publishedAt: string) {
+  const parsedDate = new Date(publishedAt);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "Live";
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    year: "numeric"
+  }).format(parsedDate);
+}
+
+export function extractSignalsFromArticles(articles: NewsArticle[]): ExtractedSignal[] {
+  return articles.map((article) => {
+    const searchableText = `${article.title} ${article.summary}`;
+    const positiveKeywordCount = countKeywordMatches(searchableText, positiveKeywords);
+    const negativeKeywordCount = countKeywordMatches(searchableText, negativeKeywords);
+    const signalScore = clamp(
+      positiveKeywordCount * 8 - negativeKeywordCount * 10,
+      -30,
+      30
+    );
+    const impact =
+      signalScore > 5 ? "Positive" : signalScore < -5 ? "Negative" : "Neutral";
+
+    return {
+      date: formatArticleDate(article.publishedAt),
+      sourceType: "News",
+      title: article.title,
+      summary: article.summary,
+      url: article.url,
+      impact,
+      signalScore,
+      positiveKeywordCount,
+      negativeKeywordCount,
+      source: article.source
+    };
+  });
+}
