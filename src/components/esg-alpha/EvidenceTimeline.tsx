@@ -91,7 +91,7 @@ export function EvidenceTimeline({ events }: EvidenceTimelineProps) {
         {groups.map((group, groupIndex) => {
           const Icon = sourceIcons[group.sourceType];
           const isExpanded = expandedGroups[group.sourceType] ?? false;
-          const visibleEvents = isExpanded ? group.events : group.events.slice(0, 3);
+          const visibleEvents = isExpanded ? group.events : group.events.slice(0, 2);
 
           return (
             <motion.div
@@ -166,7 +166,7 @@ export function EvidenceTimeline({ events }: EvidenceTimelineProps) {
                 ))}
               </div>
 
-              {group.events.length > 3 ? (
+              {group.events.length > 2 ? (
                 <button
                   type="button"
                   onClick={() =>
@@ -177,7 +177,7 @@ export function EvidenceTimeline({ events }: EvidenceTimelineProps) {
                   }
                   className="mt-3 rounded-full border border-emerald-100 bg-white/58 px-3 py-1.5 text-sm font-semibold text-[#143b34] transition hover:bg-white/80"
                 >
-                  {isExpanded ? "Show less evidence" : "Show more evidence"}
+                  {isExpanded ? "Show less evidence" : "View more evidence"}
                 </button>
               ) : null}
             </motion.div>
