@@ -37,34 +37,94 @@ export type LiveNewsResult = {
   providerUsed: ProviderUsed;
 };
 
-const primaryCompanyQueries: Record<string, string> = {
-  "DBS Group Holdings": "DBS Singapore sustainability",
-  OCBC: "OCBC sustainability",
-  UOB: "UOB Singapore sustainability",
-  Singtel: "Singtel sustainability",
-  "Keppel Ltd": "Keppel sustainability",
-  "CapitaLand Investment": "CapitaLand sustainability",
-  "Wilmar International": "Wilmar sustainability",
-  "Sembcorp Industries": "Sembcorp renewable energy"
+const companyNewsQueries: Record<string, string[]> = {
+  "DBS Group Holdings": [
+    "DBS Singapore sustainability",
+    "DBS green finance Singapore",
+    "DBS ESG Singapore",
+    "DBS climate risk"
+  ],
+  OCBC: [
+    "OCBC sustainability",
+    "OCBC green finance",
+    "OCBC ESG Singapore",
+    "OCBC climate risk"
+  ],
+  UOB: [
+    "UOB Bank sustainability",
+    "United Overseas Bank sustainability",
+    "UOB green finance",
+    "UOB ESG Singapore",
+    "UOB sustainable finance"
+  ],
+  Singtel: [
+    "Singtel sustainability",
+    "Singtel green data centre",
+    "Singtel ESG",
+    "Singtel energy efficiency"
+  ],
+  "Keppel Ltd": [
+    "Keppel sustainability",
+    "Keppel renewable energy",
+    "Keppel infrastructure sustainability",
+    "Keppel ESG"
+  ],
+  "CapitaLand Investment": [
+    "CapitaLand sustainability",
+    "CapitaLand green building",
+    "CapitaLand ESG",
+    "CapitaLand Investment sustainability"
+  ],
+  "Wilmar International": [
+    "Wilmar sustainability",
+    "Wilmar sustainable palm oil",
+    "Wilmar ESG",
+    "Wilmar traceability"
+  ],
+  "Sembcorp Industries": [
+    "Sembcorp renewable energy",
+    "Sembcorp sustainability",
+    "Sembcorp ESG",
+    "Sembcorp energy transition"
+  ]
 };
 
-const companyAliases: Record<string, string> = {
-  "DBS Group Holdings": "DBS",
-  OCBC: "OCBC",
-  UOB: "UOB",
-  Singtel: "Singtel",
-  "Keppel Ltd": "Keppel",
-  "CapitaLand Investment": "CapitaLand",
-  "Wilmar International": "Wilmar",
-  "Sembcorp Industries": "Sembcorp"
+const companyAliases: Record<string, string[]> = {
+  "DBS Group Holdings": ["DBS"],
+  OCBC: ["OCBC"],
+  UOB: ["UOB", "United Overseas Bank"],
+  Singtel: ["Singtel"],
+  "Keppel Ltd": ["Keppel"],
+  "CapitaLand Investment": ["CapitaLand"],
+  "Wilmar International": ["Wilmar"],
+  "Sembcorp Industries": ["Sembcorp"]
 };
 
-function buildGdeltQueries(companyName: string) {
-  const alias = companyAliases[companyName] ?? companyName;
-  const primaryQuery = primaryCompanyQueries[companyName] ?? `${alias} sustainability`;
-  const queries = [primaryQuery, `${alias} ESG`, alias];
+function buildCompanyQueries(companyName: string) {
+  const alias = companyAliases[companyName]?.[0] ?? companyName;
+  const queries = companyNewsQueries[companyName] ?? [
+    `${alias} sustainability`,
+    `${alias} ESG`,
+    `${alias} green finance`,
+    `${alias} climate risk`,
+    alias
+  ];
 
-  return queries.slice(0, 3);
+  return queries.slice(0, 5);
+}
+
+function articleMatchesCompany(
+  article: NewsArticle,
+  companyName: string,
+  query: string
+) {
+  const searchable = `${article.title} ${article.snippet} ${article.source}`.toLowerCase();
+  const aliases = companyAliases[companyName] ?? [companyName];
+  const queryAlias = query.split(/\s+/)[0] ?? "";
+
+  return [...aliases, queryAlias].some((alias) =>
+    searchable.includes(alias.toLowerCase())
+  );
 }
 
 function parseGdeltDate(seenDate?: string) {
@@ -210,14 +270,16 @@ function mapGdeltArticles(data: GdeltResponse) {
 export async function fetchGdeltNews(
   companyName: string
 ): Promise<LiveNewsResult> {
-  const queries = buildGdeltQueries(companyName);
+  const queries = buildCompanyQueries(companyName);
 
   for (const query of queries) {
     console.log("[GDELT] Trying query:", query);
 
     try {
-      const data = await fetchJsonWithTimeout(buildGdeltUrl(query), 2500);
-      const articles = mapGdeltArticles(data);
+      const data = await fetchJsonWithTimeout(buildGdeltUrl(query), 2000);
+      const articles = mapGdeltArticles(data)
+        .filter((article) => articleMatchesCompany(article, companyName, query))
+        .slice(0, 10);
 
       console.log("[GDELT] Articles found:", articles.length);
 
@@ -332,10 +394,11 @@ function safeDateToIso(value: string) {
 }
 
 export async function fetchGoogleNewsRss(
-  query: string
+  query: string,
+  companyName?: string
 ): Promise<LiveNewsResult> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 4500);
+  const timeout = setTimeout(() => controller.abort(), 2500);
 
   try {
     const response = await fetch(buildGoogleNewsRssUrl(query), {
@@ -351,7 +414,11 @@ export async function fetchGoogleNewsRss(
       throw new Error(`Google News RSS request failed with ${response.status}`);
     }
 
-    const articles = parseGoogleNewsRss(await response.text()).slice(0, 10);
+    const articles = parseGoogleNewsRss(await response.text())
+      .filter((article) =>
+        companyName ? articleMatchesCompany(article, companyName, query) : true
+      )
+      .slice(0, 10);
 
     return {
       articles,
@@ -410,25 +477,32 @@ export async function fetchNewsApiNews(
 export async function fetchLiveEsgNews(
   companyName: string
 ): Promise<LiveNewsResult> {
+  const queries = buildCompanyQueries(companyName);
+  let lastQuery = queries.at(-1) ?? companyName;
+
+  for (const query of queries) {
+    try {
+      const rssResult = await fetchGoogleNewsRss(query, companyName);
+      lastQuery = query;
+
+      if (rssResult.articles.length > 0) {
+        return rssResult;
+      }
+    } catch (error) {
+      console.error("Google News RSS fetch failed", query, error);
+    }
+  }
+
   const gdeltResult = await fetchGdeltNews(companyName);
 
   if (gdeltResult.articles.length > 0) {
     return gdeltResult;
   }
 
-  const rssQuery =
-    primaryCompanyQueries[companyName] ??
-    `${companyAliases[companyName] ?? companyName} sustainability`;
-
-  try {
-    const rssResult = await fetchGoogleNewsRss(rssQuery);
-
-    if (rssResult.articles.length > 0) {
-      return rssResult;
-    }
-  } catch (error) {
-    console.error("Google News RSS fetch failed", error);
-  }
-
-  return gdeltResult;
+  return {
+    articles: [],
+    articlesFound: 0,
+    queryUsed: gdeltResult.queryUsed || lastQuery,
+    providerUsed: "fallback"
+  };
 }

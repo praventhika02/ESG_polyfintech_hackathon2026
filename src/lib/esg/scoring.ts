@@ -313,10 +313,10 @@ export function scorePartialLiveSignals({
       ? "Hiring intelligence layer is monitoring ESG-related capability-building signals."
       : patentSignalCount >= 3
       ? "Patent intelligence layer is monitoring multiple ESG innovation themes for this company."
-      : "Live ESG evidence is available, but news coverage was unavailable during this scan.",
+      : "Live news was unavailable for this scan, so the alpha window is based on patent, hiring, and report signals.",
     hasReportSignal
       ? "Uploaded report evidence has been included as a high-reliability source for the next parsing module."
-      : "Market recognition appears low because live news volume was unavailable.",
+      : "Live news was unavailable for this scan, so the alpha window is based on patent, hiring, and report signals.",
     "The alpha window remains open for monitoring while stronger news confirmation develops."
   ];
 

@@ -60,7 +60,7 @@ function resolveProvider({
 
 async function testCompany(company: (typeof demoCompanies)[number]) {
   const [newsResult, patentSignals, jobSignals] = await Promise.all([
-    withTimeout(fetchLiveEsgNews(company.name), 2500).catch(() => ({
+    withTimeout(fetchLiveEsgNews(company.name), 12000).catch(() => ({
       articles: [],
       articlesFound: 0,
       queryUsed: "Timed out in test-all",
@@ -112,6 +112,7 @@ async function testCompany(company: (typeof demoCompanies)[number]) {
     companyName: company.name,
     dataMode,
     providerUsed,
+    queryUsed: newsResult.queryUsed,
     articlesFound: newsResult.articlesFound,
     patentSignalsFound: patentCount,
     jobSignalsFound: jobCount,
