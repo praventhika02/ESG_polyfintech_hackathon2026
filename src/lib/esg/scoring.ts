@@ -86,7 +86,8 @@ function investorActionFor(classification: Classification) {
 
 function whyNowFromSignals(
   signals: ExtractedSignal[],
-  marketRecognition: MarketRecognition
+  marketRecognition: MarketRecognition,
+  patentSignalCount: number
 ) {
   const positiveSignals = signals.filter((signal) => signal.impact === "Positive");
   const uniqueSources = new Set(signals.map((signal) => signal.source)).size;
@@ -105,19 +106,43 @@ function whyNowFromSignals(
     reasons[1] = "ESG signals are appearing across several distinct news sources.";
   }
 
+  if (patentSignalCount >= 3) {
+    reasons[2] =
+      "Patent intelligence layer is monitoring multiple ESG innovation themes for this company.";
+  } else if (patentSignalCount > 0) {
+    reasons[2] =
+      "Patent search layer indicates ESG-related innovation signals are being monitored.";
+  }
+
   return reasons;
+}
+
+function transformationBoostFromPatents(patentSignalCount: number) {
+  if (patentSignalCount >= 3) {
+    return 6;
+  }
+
+  if (patentSignalCount === 2) {
+    return 4;
+  }
+
+  if (patentSignalCount === 1) {
+    return 2;
+  }
+
+  return 0;
 }
 
 export function scoreSignals({
   companyId,
   companyName,
   signals,
-  hasPatentSignal = false
+  patentSignalCount = 0
 }: {
   companyId: string;
   companyName: string;
   signals: ExtractedSignal[];
-  hasPatentSignal?: boolean;
+  patentSignalCount?: number;
 }): EsgScanResult {
   const relevantSignals = signals;
   const positiveSignals = relevantSignals.filter(
@@ -141,7 +166,7 @@ export function scoreSignals({
         positiveSignals.length * 5 +
         relevantSignals.length * 3 -
         negativeSignals.length * 8 +
-        (hasPatentSignal ? 4 : 0)
+        transformationBoostFromPatents(patentSignalCount)
     ),
     0,
     100
@@ -163,7 +188,7 @@ export function scoreSignals({
         sourceCount * 4 +
         clearSignals * 3 +
         consistency * 18 +
-        (hasPatentSignal ? 3 : 0)
+        Math.min(4, patentSignalCount + 1)
     ),
     0,
     100
@@ -185,12 +210,11 @@ export function scoreSignals({
     alphaWindowMonths: alphaWindow,
     classification,
     investorAction: investorActionFor(classification),
-    whyNow: hasPatentSignal
-      ? [
-          ...whyNowFromSignals(relevantSignals, marketRecognition).slice(0, 2),
-          "Patent search layer indicates ESG-related innovation signals are being monitored."
-        ]
-      : whyNowFromSignals(relevantSignals, marketRecognition),
+    whyNow: whyNowFromSignals(
+      relevantSignals,
+      marketRecognition,
+      patentSignalCount
+    ),
     evidenceTimeline: relevantSignals
       .sort((a, b) => b.signalScore - a.signalScore)
       .slice(0, 4)

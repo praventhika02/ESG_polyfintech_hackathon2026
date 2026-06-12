@@ -121,7 +121,7 @@ function fallbackResult(
 function patentSignalsToEvidence(
   patentSignals: Awaited<ReturnType<typeof getPatentSignals>>
 ): EsgScanResult["evidenceTimeline"] {
-  return patentSignals.map((signal) => ({
+  return patentSignals.slice(0, 3).map((signal) => ({
     date: new Intl.DateTimeFormat("en", {
       month: "short",
       year: "numeric"
@@ -243,7 +243,7 @@ export async function POST(request: Request) {
       companyId,
       companyName,
       signals,
-      hasPatentSignal: patentSignals.length > 0
+      patentSignalCount: patentSignals.length
     });
 
     liveResult.articlesFound = liveNews.articlesFound;
