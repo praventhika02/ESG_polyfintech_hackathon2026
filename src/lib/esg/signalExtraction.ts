@@ -9,16 +9,17 @@ const positiveKeywords = [
   "net zero",
   "climate",
   "sustainability",
-  "green finance",
+  "sustainable",
+  "green",
   "transition",
-  "emissions reduction",
-  "carbon capture",
+  "emissions",
+  "carbon",
   "circular economy",
   "energy efficiency",
-  "sustainable aviation",
   "clean energy",
   "biodiversity",
-  "governance improvement"
+  "governance",
+  "esg"
 ];
 
 const negativeKeywords = [
@@ -44,7 +45,7 @@ function countKeywordMatches(text: string, keywords: string[]) {
   const normalisedText = text.toLowerCase();
 
   return keywords.reduce((total, keyword) => {
-    const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escapedKeyword = keyword.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const matches = normalisedText.match(new RegExp(`\\b${escapedKeyword}\\b`, "g"));
 
     return total + (matches?.length ?? 0);
@@ -66,14 +67,14 @@ function formatArticleDate(publishedAt: string) {
 
 export function extractSignalsFromArticles(articles: NewsArticle[]): ExtractedSignal[] {
   return articles.map((article) => {
-    const searchableText = `${article.title} ${article.summary}`;
+    const searchableText = `${article.title} ${article.snippet}`;
     const positiveKeywordCount = countKeywordMatches(searchableText, positiveKeywords);
     const negativeKeywordCount = countKeywordMatches(searchableText, negativeKeywords);
-    const signalScore = clamp(
-      positiveKeywordCount * 8 - negativeKeywordCount * 10,
-      -30,
-      30
-    );
+    const rawSignalScore = positiveKeywordCount * 8 - negativeKeywordCount * 10;
+    const signalScore =
+      positiveKeywordCount + negativeKeywordCount === 0
+        ? 2
+        : clamp(rawSignalScore, -30, 30);
     const impact =
       signalScore > 5 ? "Positive" : signalScore < -5 ? "Negative" : "Neutral";
 
@@ -81,7 +82,7 @@ export function extractSignalsFromArticles(articles: NewsArticle[]): ExtractedSi
       date: formatArticleDate(article.publishedAt),
       sourceType: "News",
       title: article.title,
-      summary: article.summary,
+      summary: article.snippet,
       url: article.url,
       impact,
       signalScore,

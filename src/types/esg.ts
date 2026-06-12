@@ -21,7 +21,7 @@ export type EvidenceImpact = "Positive" | "Neutral" | "Negative";
 
 export type NewsArticle = {
   title: string;
-  summary: string;
+  snippet: string;
   url: string;
   publishedAt: string;
   source: string;
@@ -53,4 +53,6 @@ export type EsgScanResult = {
   investorAction: string;
   whyNow: string[];
   evidenceTimeline: ExtractedSignal[];
+  articlesFound?: number;
+  queryUsed?: string;
 };

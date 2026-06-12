@@ -8,6 +8,8 @@ type GdeltArticle = {
   sourceCountry?: string;
   sourcecountry?: string;
   language?: string;
+  snippet?: string;
+  socialimage?: string;
 };
 
 type GdeltResponse = {
@@ -28,20 +30,38 @@ type NewsApiResponse = {
   articles?: NewsApiArticle[];
 };
 
-const esgQueryTerms = [
-  "sustainability",
-  "renewable",
-  "decarbonisation",
-  "emissions",
-  "governance",
-  "climate",
-  "green investment",
-  "net zero",
-  "transition"
-];
+export type LiveNewsResult = {
+  articles: NewsArticle[];
+  articlesFound: number;
+  queryUsed: string;
+};
 
-function buildSearchQuery(companyName: string) {
-  return `"${companyName}" AND (${esgQueryTerms.join(" OR ")})`;
+const companyAliases: Record<string, string> = {
+  "DBS Group Holdings": "DBS",
+  OCBC: "OCBC Bank",
+  UOB: "UOB Bank",
+  Singtel: "Singtel",
+  "Keppel Ltd": "Keppel",
+  "CapitaLand Investment": "CapitaLand",
+  "Wilmar International": "Wilmar",
+  "Sembcorp Industries": "Sembcorp"
+};
+
+function buildGdeltQueries(companyName: string) {
+  const alias = companyAliases[companyName];
+  const quotedCompany = `"${companyName}"`;
+  const queries = [
+    `${quotedCompany} sustainability`,
+    `${quotedCompany} ESG`,
+    `${quotedCompany} renewable`,
+    quotedCompany
+  ];
+
+  if (alias && alias !== companyName) {
+    queries.push(alias);
+  }
+
+  return queries;
 }
 
 function parseGdeltDate(seenDate?: string) {
@@ -74,49 +94,108 @@ function dedupeArticles(articles: NewsArticle[]) {
   });
 }
 
-export async function fetchGdeltNews(companyName: string): Promise<NewsArticle[]> {
-  const params = new URLSearchParams({
-    query: buildSearchQuery(companyName),
-    mode: "ArtList",
-    format: "json",
-    maxrecords: "10",
-    sort: "HybridRel"
+function wait(milliseconds: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
   });
-  const response = await fetch(
-    `https://api.gdeltproject.org/api/v2/doc/doc?${params.toString()}`,
-    {
-      next: { revalidate: 900 },
-      signal: AbortSignal.timeout(18000)
+}
+
+async function fetchJsonWithTimeout(url: string, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      throw new Error(`GDELT request failed with ${response.status}`);
     }
-  );
 
-  if (!response.ok) {
-    throw new Error(`GDELT request failed with ${response.status}`);
+    return (await response.json()) as GdeltResponse;
+  } finally {
+    clearTimeout(timeout);
   }
+}
 
-  const data = (await response.json()) as GdeltResponse;
-
+function mapGdeltArticles(data: GdeltResponse) {
   return dedupeArticles(
     (data.articles ?? [])
       .filter((article) => article.title && article.url)
       .map((article) => {
         const sourceCountry = article.sourceCountry ?? article.sourcecountry;
+        const source = article.domain ?? "GDELT";
+        const snippet = [
+          article.snippet,
+          `Live GDELT article from ${source}.`,
+          sourceCountry ? `Country: ${sourceCountry}.` : "",
+          article.language ? `Language: ${article.language}.` : ""
+        ]
+          .filter(Boolean)
+          .join(" ");
 
         return {
           title: article.title ?? "Untitled ESG article",
-          summary: [
-            article.domain ? `Source: ${article.domain}.` : "",
-            sourceCountry ? `Country: ${sourceCountry}.` : "",
-            "Matched live ESG query context: sustainability, climate, renewable, transition, emissions, governance."
-          ]
-            .filter(Boolean)
-            .join(" "),
+          snippet,
           url: article.url ?? "",
           publishedAt: parseGdeltDate(article.seendate),
-          source: article.domain ?? "GDELT"
+          source
         };
       })
   );
+}
+
+export async function fetchGdeltNews(
+  companyName: string
+): Promise<LiveNewsResult> {
+  const queries = buildGdeltQueries(companyName);
+
+  for (const [index, query] of queries.entries()) {
+    console.log("[GDELT] Trying query:", query);
+
+    try {
+      const params = new URLSearchParams({
+        query,
+        mode: "ArtList",
+        format: "json",
+        maxrecords: "20",
+        sort: "HybridRel"
+      });
+      const data = await fetchJsonWithTimeout(
+        `https://api.gdeltproject.org/api/v2/doc/doc?${params.toString()}`,
+        8000
+      );
+      const articles = mapGdeltArticles(data);
+
+      console.log("[GDELT] Articles found:", articles.length);
+
+      if (articles.length > 0) {
+        return {
+          articles,
+          articlesFound: articles.length,
+          queryUsed: query
+        };
+      }
+    } catch (error) {
+      console.error("[GDELT] Query failed:", query, error);
+    }
+
+    if (index < queries.length - 1) {
+      await wait(5200);
+    }
+  }
+
+  return {
+    articles: [],
+    articlesFound: 0,
+    queryUsed: queries.at(-1) ?? companyName
+  };
+}
+
+function buildNewsApiQuery(companyName: string) {
+  return `"${companyName}" sustainability OR ESG OR renewable OR climate`;
 }
 
 export async function fetchNewsApiNews(
@@ -124,7 +203,7 @@ export async function fetchNewsApiNews(
   apiKey: string
 ): Promise<NewsArticle[]> {
   const params = new URLSearchParams({
-    q: buildSearchQuery(companyName),
+    q: buildNewsApiQuery(companyName),
     language: "en",
     pageSize: "10",
     sortBy: "relevancy",
@@ -133,8 +212,8 @@ export async function fetchNewsApiNews(
   const response = await fetch(
     `https://newsapi.org/v2/everything?${params.toString()}`,
     {
-      next: { revalidate: 900 },
-      signal: AbortSignal.timeout(18000)
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000)
     }
   );
 
@@ -149,7 +228,7 @@ export async function fetchNewsApiNews(
       .filter((article) => article.title && article.url)
       .map((article) => ({
         title: article.title ?? "Untitled ESG article",
-        summary: article.description ?? "Matched ESG news article.",
+        snippet: article.description ?? "Matched ESG news article.",
         url: article.url ?? "",
         publishedAt: article.publishedAt ?? new Date().toISOString(),
         source: article.source?.name ?? "NewsAPI"
@@ -157,27 +236,34 @@ export async function fetchNewsApiNews(
   );
 }
 
-export async function fetchLiveEsgNews(companyName: string): Promise<NewsArticle[]> {
-  try {
-    const gdeltArticles = await fetchGdeltNews(companyName);
+export async function fetchLiveEsgNews(
+  companyName: string
+): Promise<LiveNewsResult> {
+  const gdeltResult = await fetchGdeltNews(companyName);
 
-    if (gdeltArticles.length > 0) {
-      return gdeltArticles;
-    }
-  } catch (error) {
-    console.error("GDELT ESG news fetch failed", error);
+  if (gdeltResult.articles.length > 0) {
+    return gdeltResult;
   }
 
   const newsApiKey = process.env.NEWS_API_KEY;
 
   if (!newsApiKey) {
-    return [];
+    return gdeltResult;
   }
 
   try {
-    return await fetchNewsApiNews(companyName, newsApiKey);
+    const newsApiArticles = await fetchNewsApiNews(companyName, newsApiKey);
+
+    return {
+      articles: newsApiArticles,
+      articlesFound: newsApiArticles.length,
+      queryUsed:
+        newsApiArticles.length > 0
+          ? `NewsAPI: ${buildNewsApiQuery(companyName)}`
+          : gdeltResult.queryUsed
+    };
   } catch (error) {
     console.error("NewsAPI ESG news fetch failed", error);
-    return [];
+    return gdeltResult;
   }
 }

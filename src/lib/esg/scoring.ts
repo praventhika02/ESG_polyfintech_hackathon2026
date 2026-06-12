@@ -117,9 +117,7 @@ export function scoreSignals({
   companyName: string;
   signals: ExtractedSignal[];
 }): EsgScanResult {
-  const relevantSignals = signals.filter(
-    (signal) => signal.positiveKeywordCount + signal.negativeKeywordCount > 0
-  );
+  const relevantSignals = signals;
   const positiveSignals = relevantSignals.filter(
     (signal) => signal.signalScore > 5
   );
@@ -127,18 +125,20 @@ export function scoreSignals({
     (signal) => signal.signalScore < -5
   );
   const averagePositiveScore =
-    positiveSignals.length > 0
-      ? positiveSignals.reduce((total, signal) => total + signal.signalScore, 0) /
-        positiveSignals.length
+    relevantSignals.length > 0
+      ? relevantSignals.reduce(
+          (total, signal) => total + Math.max(0, signal.signalScore),
+          0
+        ) / relevantSignals.length
       : 0;
 
   const transformationStrength = clamp(
     Math.round(
-      28 +
-        averagePositiveScore * 1.35 +
-        positiveSignals.length * 6 +
-        relevantSignals.length * 2 -
-        negativeSignals.length * 9
+      18 +
+        averagePositiveScore * 1.8 +
+        positiveSignals.length * 5 +
+        relevantSignals.length * 3 -
+        negativeSignals.length * 8
     ),
     0,
     100
@@ -155,8 +155,8 @@ export function scoreSignals({
         relevantSignals.length;
   const confidence = clamp(
     Math.round(
-      34 +
-        relevantSignals.length * 5 +
+      28 +
+        relevantSignals.length * 4 +
         sourceCount * 4 +
         clearSignals * 3 +
         consistency * 18
@@ -183,7 +183,7 @@ export function scoreSignals({
     investorAction: investorActionFor(classification),
     whyNow: whyNowFromSignals(relevantSignals, marketRecognition),
     evidenceTimeline: relevantSignals
-      .sort((a, b) => Math.abs(b.signalScore) - Math.abs(a.signalScore))
+      .sort((a, b) => b.signalScore - a.signalScore)
       .slice(0, 4)
   };
 }

@@ -43,7 +43,14 @@ function normaliseSourceType(sourceType: string): EvidenceSourceType {
   return "News";
 }
 
-function fallbackResult(companyId: string, companyName: string): EsgScanResult {
+function fallbackResult(
+  companyId: string,
+  companyName: string,
+  debug?: {
+    articlesFound?: number;
+    queryUsed?: string;
+  }
+): EsgScanResult {
   const fallback =
     mockResults[companyId as keyof typeof mockResults] ?? mockResults.sembcorp;
 
@@ -70,11 +77,16 @@ function fallbackResult(companyId: string, companyName: string): EsgScanResult {
       positiveKeywordCount: 1,
       negativeKeywordCount: 0,
       source: "Demo fallback"
-    }))
+    })),
+    articlesFound: debug?.articlesFound ?? 0,
+    queryUsed: debug?.queryUsed ?? "Demo fallback"
   };
 }
 
 export async function POST(request: Request) {
+  let requestedCompanyId = "sembcorp";
+  let requestedCompanyName = "Sembcorp Industries";
+
   try {
     const body = (await request.json()) as ScanRequest;
     const companyId = body.companyId?.trim();
@@ -87,33 +99,42 @@ export async function POST(request: Request) {
       );
     }
 
-    const articles = await fetchLiveEsgNews(companyName);
+    requestedCompanyId = companyId;
+    requestedCompanyName = companyName;
 
-    if (articles.length === 0) {
-      return NextResponse.json(fallbackResult(companyId, companyName));
+    console.log("[ESG Scan] Starting scan for:", companyName);
+
+    const liveNews = await fetchLiveEsgNews(companyName);
+
+    if (liveNews.articles.length === 0) {
+      console.log("[ESG Scan] Data mode:", "fallback");
+      return NextResponse.json(
+        fallbackResult(companyId, companyName, {
+          articlesFound: liveNews.articlesFound,
+          queryUsed: liveNews.queryUsed
+        })
+      );
     }
 
-    const signals = extractSignalsFromArticles(articles);
-    const relevantSignals = signals.filter(
-      (signal) => signal.positiveKeywordCount + signal.negativeKeywordCount > 0
-    );
+    const signals = extractSignalsFromArticles(liveNews.articles);
+    const liveResult = scoreSignals({
+      companyId,
+      companyName,
+      signals
+    });
 
-    if (relevantSignals.length === 0) {
-      return NextResponse.json(fallbackResult(companyId, companyName));
-    }
+    liveResult.articlesFound = liveNews.articlesFound;
+    liveResult.queryUsed = liveNews.queryUsed;
 
-    return NextResponse.json(
-      scoreSignals({
-        companyId,
-        companyName,
-        signals: relevantSignals
-      })
-    );
+    console.log("[ESG Scan] Data mode:", liveResult.dataMode);
+
+    return NextResponse.json(liveResult);
   } catch (error) {
     console.error("ESG scan route failed", error);
+    console.log("[ESG Scan] Data mode:", "fallback");
 
     return NextResponse.json(
-      fallbackResult("sembcorp", "Sembcorp Industries"),
+      fallbackResult(requestedCompanyId, requestedCompanyName),
       { status: 200 }
     );
   }
