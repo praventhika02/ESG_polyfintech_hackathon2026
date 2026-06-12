@@ -89,6 +89,7 @@ function demoFallbackResult(companyId: CompanyId, companyName: string): EsgScanR
     })),
     articlesFound: 0,
     patentSignalsFound: 0,
+    jobSignalsFound: 0,
     reportSignalIncluded: false,
     reportSignalsFound: 0,
     queryUsed: "Client fallback",
@@ -199,6 +200,7 @@ export default function Home() {
                 dataMode={scanResult.dataMode}
                 articlesFound={scanResult.articlesFound}
                 patentSignalsFound={scanResult.patentSignalsFound}
+                jobSignalsFound={scanResult.jobSignalsFound}
                 reportSignalIncluded={scanResult.reportSignalIncluded}
                 reportSignalsFound={scanResult.reportSignalsFound}
                 queryUsed={scanResult.queryUsed}

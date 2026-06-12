@@ -7,6 +7,7 @@ export async function GET() {
     modules: {
       newsProvider: "enabled",
       patentProvider: "enabled",
+      jobProvider: "enabled",
       reportUpload: "enabled",
       fallbackProtection: "enabled"
     },

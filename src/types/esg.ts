@@ -14,6 +14,7 @@ export type ProviderUsed =
   | "gdelt"
   | "google_news_rss"
   | "patents_only"
+  | "jobs_only"
   | "report_only"
   | "mixed_live"
   | "fallback";
@@ -69,6 +70,7 @@ export type EsgScanResult = {
   evidenceTimeline: ExtractedSignal[];
   articlesFound?: number;
   patentSignalsFound?: number;
+  jobSignalsFound?: number;
   reportSignalIncluded?: boolean;
   reportSignalsFound?: number;
   queryUsed?: string;

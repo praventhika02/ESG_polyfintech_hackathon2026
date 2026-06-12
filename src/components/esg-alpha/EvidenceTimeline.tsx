@@ -43,6 +43,10 @@ function sourceStatus(event: ExtractedSignal) {
     return "Live patent search";
   }
 
+  if (event.sourceType === "Jobs") {
+    return "Live job search";
+  }
+
   if (event.sourceType === "Reports") {
     return "Uploaded report";
   }

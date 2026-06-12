@@ -91,7 +91,8 @@ function investorActionFor(classification: Classification) {
 function whyNowFromSignals(
   signals: ExtractedSignal[],
   marketRecognition: MarketRecognition,
-  patentSignalCount: number
+  patentSignalCount: number,
+  jobSignalCount: number
 ) {
   const positiveSignals = signals.filter((signal) => signal.impact === "Positive");
   const uniqueSources = new Set(signals.map((signal) => signal.source)).size;
@@ -118,6 +119,11 @@ function whyNowFromSignals(
       "Patent search layer indicates ESG-related innovation signals are being monitored.";
   }
 
+  if (jobSignalCount >= 3) {
+    reasons[1] =
+      "Hiring intelligence layer is monitoring ESG-related capability-building signals.";
+  }
+
   return reasons;
 }
 
@@ -137,17 +143,43 @@ function transformationBoostFromPatents(patentSignalCount: number) {
   return 0;
 }
 
+function transformationBoostFromJobs(jobSignalCount: number) {
+  if (jobSignalCount >= 3) {
+    return 6;
+  }
+
+  if (jobSignalCount > 0) {
+    return 3;
+  }
+
+  return 0;
+}
+
+function confidenceBoostFromJobs(jobSignalCount: number) {
+  if (jobSignalCount >= 3) {
+    return 4;
+  }
+
+  if (jobSignalCount > 0) {
+    return 2;
+  }
+
+  return 0;
+}
+
 export function scoreSignals({
   companyId,
   companyName,
   signals,
   patentSignalCount = 0,
+  jobSignalCount = 0,
   hasAdditionalSource = false
 }: {
   companyId: string;
   companyName: string;
   signals: ExtractedSignal[];
   patentSignalCount?: number;
+  jobSignalCount?: number;
   hasAdditionalSource?: boolean;
 }): EsgScanResult {
   const relevantSignals = signals;
@@ -172,7 +204,8 @@ export function scoreSignals({
         positiveSignals.length * 5 +
         relevantSignals.length * 3 -
         negativeSignals.length * 8 +
-        transformationBoostFromPatents(patentSignalCount)
+        transformationBoostFromPatents(patentSignalCount) +
+        transformationBoostFromJobs(jobSignalCount)
     ),
     0,
     100
@@ -194,7 +227,8 @@ export function scoreSignals({
         sourceCount * 4 +
         clearSignals * 3 +
         consistency * 18 +
-        Math.min(4, patentSignalCount + 1)
+        Math.min(4, patentSignalCount + 1) +
+        confidenceBoostFromJobs(jobSignalCount)
     ),
     0,
     100
@@ -226,7 +260,8 @@ export function scoreSignals({
     whyNow: whyNowFromSignals(
       relevantSignals,
       marketRecognition,
-      patentSignalCount
+      patentSignalCount,
+      jobSignalCount
     ),
     evidenceTimeline: relevantSignals
       .sort((a, b) => b.signalScore - a.signalScore)
@@ -238,31 +273,45 @@ export function scorePartialLiveSignals({
   companyId,
   companyName,
   patentSignalCount,
+  jobSignalCount,
   hasReportSignal
 }: {
   companyId: string;
   companyName: string;
   patentSignalCount: number;
+  jobSignalCount: number;
   hasReportSignal: boolean;
 }): EsgScanResult {
   const patentBoost = transformationBoostFromPatents(patentSignalCount);
+  const jobBoost = transformationBoostFromJobs(jobSignalCount);
   const transformationStrength = clamp(
-    58 + patentSignalCount * 5 + patentBoost + (hasReportSignal ? 6 : 0),
+    58 +
+      patentSignalCount * 5 +
+      patentBoost +
+      jobSignalCount * 4 +
+      jobBoost +
+      (hasReportSignal ? 6 : 0),
     60,
     80
   );
   const confidenceCap = hasReportSignal ? 88 : 82;
   const confidence = clamp(
-    54 + patentSignalCount * 7 + (hasReportSignal ? 8 : 0),
+    54 +
+      patentSignalCount * 7 +
+      jobSignalCount * 5 +
+      confidenceBoostFromJobs(jobSignalCount) +
+      (hasReportSignal ? 8 : 0),
     55,
     confidenceCap
   );
   const classification: Classification =
-    patentSignalCount > 0 && !hasReportSignal
+    (patentSignalCount > 0 || jobSignalCount > 0) && !hasReportSignal
       ? "Innovation Watchlist"
       : "Evidence Watchlist";
   const whyNow = [
-    patentSignalCount >= 3
+    jobSignalCount >= 3
+      ? "Hiring intelligence layer is monitoring ESG-related capability-building signals."
+      : patentSignalCount >= 3
       ? "Patent intelligence layer is monitoring multiple ESG innovation themes for this company."
       : "Live ESG evidence is available, but news coverage was unavailable during this scan.",
     hasReportSignal

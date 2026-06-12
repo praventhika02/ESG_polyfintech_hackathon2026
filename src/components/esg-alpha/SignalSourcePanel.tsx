@@ -5,6 +5,7 @@ import {
   DatabaseZap,
   FileText,
   FlaskConical,
+  BriefcaseBusiness,
   Newspaper,
   Search
 } from "lucide-react";
@@ -16,6 +17,7 @@ type SignalSourcePanelProps = {
   dataMode: DataMode;
   articlesFound?: number;
   patentSignalsFound?: number;
+  jobSignalsFound?: number;
   reportSignalIncluded?: boolean;
   reportSignalsFound?: number;
   queryUsed?: string;
@@ -27,6 +29,7 @@ const providerDisplay: Record<ProviderUsed, string> = {
   google_news_rss: "Google News RSS",
   gdelt: "GDELT",
   patents_only: "Patent intelligence only",
+  jobs_only: "Hiring intelligence only",
   report_only: "Uploaded report only",
   fallback: "Demo scenario"
 };
@@ -67,10 +70,12 @@ function sourceStatus(active: boolean, activeLabel = "Active", inactiveLabel = "
 function sourceMix({
   articlesFound,
   patentSignalsFound,
+  jobSignalsFound,
   reportSignalsFound
 }: {
   articlesFound: number;
   patentSignalsFound: number;
+  jobSignalsFound: number;
   reportSignalsFound: number;
 }) {
   const segments = [
@@ -83,6 +88,11 @@ function sourceMix({
       key: "Patents",
       value: patentSignalsFound,
       className: "bg-gradient-to-r from-blue-500 to-cyan-500"
+    },
+    {
+      key: "Jobs",
+      value: jobSignalsFound,
+      className: "bg-gradient-to-r from-violet-500 to-blue-500"
     },
     {
       key: "Report",
@@ -109,6 +119,7 @@ export function SignalSourcePanel({
   dataMode,
   articlesFound = 0,
   patentSignalsFound = 0,
+  jobSignalsFound = 0,
   reportSignalIncluded = false,
   reportSignalsFound,
   queryUsed,
@@ -118,6 +129,7 @@ export function SignalSourcePanel({
   const mode = modeDisplay[dataMode];
   const newsStatus = sourceStatus(articlesFound > 0);
   const patentStatus = sourceStatus(patentSignalsFound > 0);
+  const jobStatus = sourceStatus(jobSignalsFound > 0);
   const reportStatus = sourceStatus(
     reportCount > 0,
     "Included",
@@ -141,6 +153,14 @@ export function SignalSourcePanel({
       accent: "text-blue-700"
     },
     {
+      title: "Hiring Intelligence",
+      count: jobSignalsFound,
+      label: "ESG hiring queries",
+      icon: BriefcaseBusiness,
+      status: jobStatus,
+      accent: "text-violet-700"
+    },
+    {
       title: "Report Signal",
       count: reportCount,
       label: "Uploaded report signals",
@@ -152,6 +172,7 @@ export function SignalSourcePanel({
   const mixSegments = sourceMix({
     articlesFound,
     patentSignalsFound,
+    jobSignalsFound,
     reportSignalsFound: reportCount
   });
   const mixTotal = mixSegments.reduce((total, segment) => total + segment.value, 0);
@@ -180,7 +201,7 @@ export function SignalSourcePanel({
         </span>
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         {sources.map((source, index) => {
           const Icon = source.icon;
 
@@ -265,6 +286,7 @@ export function SignalSourcePanel({
               <span>dataMode: {dataMode}</span>
               <span>articlesFound: {articlesFound}</span>
               <span>patentSignalsFound: {patentSignalsFound}</span>
+              <span>jobSignalsFound: {jobSignalsFound}</span>
               <span>
                 reportSignalIncluded: {reportSignalIncluded ? "true" : "false"}
               </span>

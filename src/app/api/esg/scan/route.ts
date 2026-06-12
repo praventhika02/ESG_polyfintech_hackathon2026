@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchLiveEsgNews } from "@/lib/esg/providers/newsProvider";
 import { getPatentSignals } from "@/lib/esg/providers/patentProvider";
+import { getJobSignals } from "@/lib/esg/providers/jobProvider";
 import { scorePartialLiveSignals, scoreSignals } from "@/lib/esg/scoring";
 import { extractSignalsFromArticles } from "@/lib/esg/signalExtraction";
 import { mockResults } from "@/lib/esg/mockResults";
@@ -121,6 +122,7 @@ function fallbackResult(
     })),
     articlesFound: debug?.articlesFound ?? 0,
     patentSignalsFound: 0,
+    jobSignalsFound: 0,
     reportSignalIncluded: false,
     reportSignalsFound: 0,
     queryUsed: debug?.queryUsed ?? "Demo fallback",
@@ -131,15 +133,24 @@ function fallbackResult(
 function resolveScanMode({
   newsCount,
   patentCount,
+  jobCount,
   hasReportSignal,
   newsProvider
 }: {
   newsCount: number;
   patentCount: number;
+  jobCount: number;
   hasReportSignal: boolean;
   newsProvider: ProviderUsed;
 }): Pick<EsgScanResult, "dataMode" | "providerUsed"> {
-  if (newsCount > 0 && patentCount > 0) {
+  const liveSourceCount = [
+    newsCount > 0,
+    patentCount > 0,
+    jobCount > 0,
+    hasReportSignal
+  ].filter(Boolean).length;
+
+  if (newsCount > 0 && liveSourceCount > 1) {
     return { dataMode: "live", providerUsed: "mixed_live" };
   }
 
@@ -147,12 +158,16 @@ function resolveScanMode({
     return { dataMode: "live", providerUsed: newsProvider };
   }
 
-  if (patentCount > 0 && hasReportSignal) {
+  if (liveSourceCount > 1) {
     return { dataMode: "partial_live", providerUsed: "mixed_live" };
   }
 
   if (patentCount > 0) {
     return { dataMode: "partial_live", providerUsed: "patents_only" };
+  }
+
+  if (jobCount > 0) {
+    return { dataMode: "partial_live", providerUsed: "jobs_only" };
   }
 
   if (hasReportSignal) {
@@ -199,6 +214,48 @@ function withPatentSignals(
     patentSignalsFound: patentSignals.length,
     evidenceTimeline: [
       ...patentSignalsToEvidence(patentSignals),
+      ...result.evidenceTimeline
+    ]
+  };
+}
+
+function jobSignalsToEvidence(
+  jobSignals: Awaited<ReturnType<typeof getJobSignals>>
+): EsgScanResult["evidenceTimeline"] {
+  return jobSignals.slice(0, 3).map((signal) => ({
+    date: new Intl.DateTimeFormat("en", {
+      month: "short",
+      year: "numeric"
+    }).format(new Date(signal.publishedAt)),
+    sourceType: "Jobs",
+    title: signal.title,
+    summary: signal.snippet,
+    url: signal.url,
+    impact: "Neutral",
+    signalScore: signal.signalScore,
+    positiveKeywordCount: 1,
+    negativeKeywordCount: 0,
+    source: signal.source,
+    sourceReliability: "Medium"
+  }));
+}
+
+function withJobSignals(
+  result: EsgScanResult,
+  jobSignals: Awaited<ReturnType<typeof getJobSignals>>
+): EsgScanResult {
+  if (jobSignals.length === 0) {
+    return {
+      ...result,
+      jobSignalsFound: 0
+    };
+  }
+
+  return {
+    ...result,
+    jobSignalsFound: jobSignals.length,
+    evidenceTimeline: [
+      ...jobSignalsToEvidence(jobSignals),
       ...result.evidenceTimeline
     ]
   };
@@ -284,20 +341,26 @@ export async function POST(request: Request) {
 
     console.log("[API] Scan started", companyName);
 
-    const [liveNews, patentSignals] = await Promise.all([
+    const [liveNews, patentSignals, jobSignals] = await Promise.all([
       withTimeout(fetchLiveEsgNews(companyName), 14000),
       getPatentSignals(companyName).catch((error) => {
         console.error("Patent signal fetch failed", error);
+        return [];
+      }),
+      getJobSignals(companyName).catch((error) => {
+        console.error("Job signal fetch failed", error);
         return [];
       })
     ]);
 
     const newsCount = liveNews.articles.length;
     const patentCount = patentSignals.length;
+    const jobCount = jobSignals.length;
     const hasReportSignal = reportFileNames.length > 0;
     const { dataMode, providerUsed } = resolveScanMode({
       newsCount,
       patentCount,
+      jobCount,
       hasReportSignal,
       newsProvider: liveNews.providerUsed
     });
@@ -322,21 +385,25 @@ export async function POST(request: Request) {
         companyId,
         companyName,
         patentSignalCount: patentCount,
+        jobSignalCount: jobCount,
         hasReportSignal
       });
 
       partialResult.providerUsed = providerUsed;
       partialResult.articlesFound = liveNews.articlesFound;
       partialResult.patentSignalsFound = patentCount;
+      partialResult.jobSignalsFound = jobCount;
       partialResult.reportSignalIncluded = hasReportSignal;
       partialResult.reportSignalsFound = reportFileNames.length;
       partialResult.queryUsed =
         patentCount > 0
           ? "Google Patents ESG innovation queries"
+          : jobCount > 0
+          ? "Google Jobs ESG hiring queries"
           : reportFileNames.join(", ") || "Uploaded report";
 
       const responseResult = withUploadedReportSignal(
-        withPatentSignals(partialResult, patentSignals),
+        withJobSignals(withPatentSignals(partialResult, patentSignals), jobSignals),
         reportFileNames
       );
 
@@ -354,11 +421,13 @@ export async function POST(request: Request) {
       companyName,
       signals,
       patentSignalCount: patentCount,
-      hasAdditionalSource: patentCount > 0 || hasReportSignal
+      jobSignalCount: jobCount,
+      hasAdditionalSource: patentCount > 0 || jobCount > 0 || hasReportSignal
     });
 
     liveResult.articlesFound = liveNews.articlesFound;
     liveResult.patentSignalsFound = patentCount;
+    liveResult.jobSignalsFound = jobCount;
     liveResult.reportSignalIncluded = hasReportSignal;
     liveResult.reportSignalsFound = reportFileNames.length;
     liveResult.queryUsed = liveNews.queryUsed;
@@ -367,7 +436,7 @@ export async function POST(request: Request) {
       investorActionForClassification(liveResult.classification) ??
       liveResult.investorAction;
     const responseResult = withUploadedReportSignal(
-      withPatentSignals(liveResult, patentSignals),
+      withJobSignals(withPatentSignals(liveResult, patentSignals), jobSignals),
       reportFileNames
     );
 
