@@ -5,12 +5,12 @@ import { useMemo, useState } from "react";
 import { CompanySelector } from "@/components/esg-alpha/CompanySelector";
 import { AnnualReportUpload } from "@/components/esg-alpha/AnnualReportUpload";
 import { EvidenceTimeline } from "@/components/esg-alpha/EvidenceTimeline";
+import { FinalVerdictPanel } from "@/components/esg-alpha/FinalVerdictPanel";
 import { HeroSection } from "@/components/esg-alpha/HeroSection";
-import { InvestorActionCard } from "@/components/esg-alpha/InvestorActionCard";
 import { ResultSummary } from "@/components/esg-alpha/ResultSummary";
 import { ScanButton } from "@/components/esg-alpha/ScanButton";
 import { ScanningPanel } from "@/components/esg-alpha/ScanningPanel";
-import { ScoreExplanationPanel } from "@/components/esg-alpha/ScoreExplanationPanel";
+import { ScoreMethodologyPanel } from "@/components/esg-alpha/ScoreMethodologyPanel";
 import { SignalSourcePanel } from "@/components/esg-alpha/SignalSourcePanel";
 import { demoCompanies, type CompanyId } from "@/lib/esg/mockCompanies";
 import { mockResults } from "@/lib/esg/mockResults";
@@ -207,23 +207,42 @@ export default function Home() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
             >
-              <ResultSummary company={selectedCompany} result={scanResult} />
-              <SignalSourcePanel
-                providerUsed={scanResult.providerUsed}
-                dataMode={scanResult.dataMode}
-                articlesFound={scanResult.articlesFound}
-                patentSignalsFound={scanResult.patentSignalsFound}
-                jobSignalsFound={scanResult.jobSignalsFound}
-                reportSignalIncluded={scanResult.reportSignalIncluded}
-                reportSignalsFound={scanResult.reportSignalsFound}
-                queryUsed={scanResult.queryUsed}
-                generatedAt={scanResult.generatedAt}
-              />
-              <ScoreExplanationPanel result={scanResult} />
-              <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
-                <InvestorActionCard result={scanResult} />
-                <EvidenceTimeline events={scanResult.evidenceTimeline} />
+              <div id="overview">
+                <ResultSummary company={selectedCompany} result={scanResult} />
               </div>
+              <nav className="sticky top-3 z-20 -mt-2 flex flex-wrap gap-2 rounded-2xl border border-white/65 bg-white/55 p-2 text-sm font-semibold text-[#42534d] shadow-sm backdrop-blur-xl">
+                {[
+                  ["Overview", "#overview"],
+                  ["Sources", "#sources"],
+                  ["Methodology", "#methodology"],
+                  ["Evidence", "#evidence"],
+                  ["Verdict", "#verdict"]
+                ].map(([label, href]) => (
+                  <a
+                    key={href}
+                    href={href}
+                    className="rounded-full px-3 py-1.5 transition hover:bg-white/80 hover:text-[#143b34]"
+                  >
+                    {label}
+                  </a>
+                ))}
+              </nav>
+              <div id="sources">
+                <SignalSourcePanel
+                  providerUsed={scanResult.providerUsed}
+                  dataMode={scanResult.dataMode}
+                  articlesFound={scanResult.articlesFound}
+                  patentSignalsFound={scanResult.patentSignalsFound}
+                  jobSignalsFound={scanResult.jobSignalsFound}
+                  reportSignalIncluded={scanResult.reportSignalIncluded}
+                  reportSignalsFound={scanResult.reportSignalsFound}
+                  queryUsed={scanResult.queryUsed}
+                  generatedAt={scanResult.generatedAt}
+                />
+              </div>
+              <ScoreMethodologyPanel result={scanResult} />
+              <EvidenceTimeline events={scanResult.evidenceTimeline} />
+              <FinalVerdictPanel result={scanResult} />
             </motion.div>
           ) : (
             <motion.section
