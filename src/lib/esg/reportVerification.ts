@@ -15,6 +15,15 @@ function normalise(value: string) {
   return value.toLowerCase().replace(/[_-]+/g, " ");
 }
 
+function detectCompanyHint(fileName: string, selectedCompanyName: string) {
+  const lowerFileName = normalise(fileName);
+
+  return Object.entries(companyAliases).find(([companyName, aliases]) => {
+    if (companyName === selectedCompanyName) return false;
+    return aliases.some((alias) => lowerFileName.includes(alias));
+  })?.[0] ?? null;
+}
+
 export function verifyReportFileName(
   fileName: string,
   companyName: string
@@ -22,6 +31,7 @@ export function verifyReportFileName(
   const aliases = companyAliases[companyName] ?? [companyName.toLowerCase()];
   const lowerFileName = normalise(fileName);
   const matchedAlias = aliases.find((alias) => lowerFileName.includes(alias));
+  const detectedCompanyHint = detectCompanyHint(fileName, companyName);
 
   if (matchedAlias) {
     return {
@@ -35,8 +45,10 @@ export function verifyReportFileName(
   return {
     fileName,
     status: "mismatch",
-    detectedCompanyHint: null,
-    message: `Selected company is ${companyName}, but this file does not appear to match ${aliases[0].toUpperCase()} aliases. Please upload the correct company report.`
+    detectedCompanyHint,
+    message: detectedCompanyHint
+      ? `Report mismatch detected. Selected company is ${companyName}, but the filename appears to reference ${detectedCompanyHint}. This report is excluded from scoring.`
+      : `Report mismatch detected. Selected company is ${companyName}, but this file does not appear to match ${aliases[0].toUpperCase()} aliases. This report is excluded from scoring.`
   };
 }
 

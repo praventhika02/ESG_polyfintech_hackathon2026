@@ -10,24 +10,36 @@ type AiInvestmentSummaryProps = {
 
 export function buildInvestmentSummary(result: EsgScanResult) {
   const gap = result.recognitionGap ?? 0;
+  const articles = result.articlesFound ?? 0;
+  const patents = result.patentSignalsFound ?? 0;
+  const jobs = result.jobSignalsFound ?? 0;
+  const reports = result.verifiedReportsFound ?? result.reportSignalsFound ?? 0;
+  const evidenceParts = [
+    `${articles} live news article${articles === 1 ? "" : "s"}`,
+    `${patents} patent intelligence quer${patents === 1 ? "y" : "ies"}`,
+    `${jobs} hiring intelligence quer${jobs === 1 ? "y" : "ies"}`,
+    `${reports} verified report signal${reports === 1 ? "" : "s"}`
+  ];
+  const gapMeaning =
+    gap >= 30
+      ? "transformation evidence is materially ahead of recognition"
+      : gap >= 15
+        ? "transformation evidence is ahead, but recognition is starting to catch up"
+        : gap >= 0
+          ? "transformation and recognition are broadly balanced"
+          : "recognition appears ahead of the current transformation signal";
+  const implication =
+    result.classification === "Early Alpha Opportunity"
+      ? "prioritise deeper due diligence before wider recognition compresses the window"
+      : result.classification === "Emerging ESG Improver"
+        ? "monitor the signal trend and look for stronger recognition lag"
+        : result.classification === "Already Recognised"
+          ? "treat this as ESG quality exposure rather than an early-alpha discovery"
+          : result.classification === "Innovation Watchlist"
+            ? "wait for confirmation from stronger news or verified report evidence"
+            : "avoid immediate action until evidence quality and source agreement improve";
 
-  if (result.classification === "Early Alpha Opportunity") {
-    return `${result.companyName} shows strong ESG transformation evidence across live sources while market recognition remains incomplete. The recognition gap of ${gap} suggests a potential early-entry window. Investors should prioritise deeper due diligence before the market catches up.`;
-  }
-
-  if (result.classification === "Already Recognised") {
-    return `${result.companyName} shows strong ESG activity, but public recognition is already high. The alpha window appears narrow because the market may have already priced in the ESG story. Investors may treat this as ESG quality exposure rather than early-alpha discovery.`;
-  }
-
-  if (result.classification === "Innovation Watchlist") {
-    return `${result.companyName} shows early patent and hiring signals, but public news recognition remains limited. The current evidence is not yet strong enough for immediate action. Investors should monitor for confirmation through reports or high-reliability news.`;
-  }
-
-  if (result.classification === "Emerging ESG Improver") {
-    return `${result.companyName} shows developing ESG transformation evidence across multiple signal layers. The recognition gap of ${gap} indicates the story is building, but not yet a decisive early-alpha call. Investors should monitor closely and rescan after new disclosures or high-reliability news.`;
-  }
-
-  return `${result.companyName} does not yet show enough confirmed evidence for an investor action signal. The recognition gap and source mix are not strong enough to support early-alpha conviction. Investors should wait for stronger source diversity, verified reports, or higher-reliability news.`;
+  return `Evidence exists across ${evidenceParts.join(", ")}. This produces Transformation Strength of ${result.transformationStrength}/100 versus Recognition Score of ${result.recognitionScore ?? 0}/100, with Confidence at ${result.confidence}/100. The recognition gap is ${gap}, which means ${gapMeaning}. Investor implication: ${implication}.`;
 }
 
 export function AiInvestmentSummary({ result }: AiInvestmentSummaryProps) {

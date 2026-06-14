@@ -9,10 +9,12 @@ type ScanningPanelProps = {
 };
 
 const scanSteps = [
-  "Scanning live ESG news...",
-  "Extracting transformation signals...",
-  "Estimating alpha window...",
-  "Generating investor action..."
+  "Fetching ESG news",
+  "Checking patent innovation layer",
+  "Checking hiring intelligence layer",
+  "Verifying uploaded disclosures",
+  "Calculating transformation vs recognition gap",
+  "Generating investor verdict"
 ];
 
 export function ScanningPanel({ company }: ScanningPanelProps) {
@@ -24,7 +26,7 @@ export function ScanningPanel({ company }: ScanningPanelProps) {
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.35 }}
     >
-      <div className="relative rounded-xl border border-emerald-900/10 bg-[#10231f] p-5 text-white">
+      <div className="relative rounded-xl border border-emerald-300/15 bg-[#10231f] p-5 text-white shadow-[0_28px_90px_rgba(16,35,31,0.2)]">
         <motion.div
           aria-hidden="true"
           className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-emerald-300/22 to-transparent"
@@ -43,19 +45,20 @@ export function ScanningPanel({ company }: ScanningPanelProps) {
             </p>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[560px]">
             {scanSteps.map((step, index) => (
               <motion.div
                 key={step}
-                className="rounded-lg border border-white/10 bg-white/[0.055] px-4 py-3 font-mono text-xs text-emerald-50/80"
-                animate={{ opacity: [0.45, 1, 0.45] }}
+                className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.055] px-4 py-3 font-mono text-xs text-emerald-50/80"
+                animate={{ opacity: [0.45, 1, 0.45], x: [0, 2, 0] }}
                 transition={{
-                  duration: 1.15,
-                  delay: index * 0.18,
+                  duration: 1.4,
+                  delay: index * 0.22,
                   repeat: Infinity,
                   ease: "easeInOut"
                 }}
               >
+                <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_14px_rgba(110,231,183,0.8)]" />
                 {step}
               </motion.div>
             ))}

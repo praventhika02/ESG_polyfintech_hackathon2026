@@ -19,6 +19,10 @@ const formalRecognitionKeywords = [
   "ftse4good",
   "djsi",
   "index inclusion",
+  "etf inclusion",
+  "esg etf",
+  "media coverage",
+  "public discussion",
   "top ranked",
   "sustainability award",
   "annual report ranking"
@@ -229,13 +233,17 @@ function reliabilityPoints(reliability: SourceReliability) {
   return 1;
 }
 
-function consistencyScore(signals: ExtractedSignal[]) {
-  const negative = signals.filter((signal) => signal.impact === "Negative").length;
+function sourceAgreementScore(signals: ExtractedSignal[]) {
   const total = signals.length;
-  if (total === 0) return 10;
-  if (negative / total > 0.5) return 2;
-  if (negative / total >= 0.25) return 5;
-  return 10;
+  if (total === 0) return 6;
+
+  const positive = signals.filter((signal) => signal.impact === "Positive").length;
+  const neutral = signals.filter((signal) => signal.impact === "Neutral").length;
+  const negative = signals.filter((signal) => signal.impact === "Negative").length;
+  const supportiveRatio = (positive + neutral * 0.6) / total;
+  const penalty = negative / total;
+
+  return clamp(Math.round(supportiveRatio * 10 - penalty * 5), 2, 10);
 }
 
 function appliedConfidenceCap({
@@ -333,7 +341,7 @@ function scoreModel({
   const recognitionGap = transformationStrength - recognitionScore;
   const interpretation = gapInterpretation(recognitionGap);
   const evidenceCount = newsCount + patentSignalCount + jobSignalCount + verifiedReportCount;
-  const volumeScore = Math.min(25, evidenceCount * 2.5);
+  const volumeScore = Math.min(25, evidenceCount * 1.8);
   const diversityScore = sourceDiversityScore(activeSourceCount, "confidence");
   const reliabilityScore = Math.min(
     25,
@@ -343,7 +351,7 @@ function scoreModel({
       verifiedReportCount * 5
   );
   const reportSupport = verifiedReportCount >= 2 ? 15 : verifiedReportCount === 1 ? 8 : 0;
-  const signalConsistency = consistencyScore(signals);
+  const signalConsistency = sourceAgreementScore(signals);
   const rawConfidence = volumeScore + diversityScore + reliabilityScore + reportSupport + signalConsistency;
   const hasHighReliabilityEvidence =
     verifiedReportCount > 0 || signals.some((signal) => signal.sourceReliability === "High");

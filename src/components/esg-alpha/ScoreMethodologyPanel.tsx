@@ -157,7 +157,7 @@ export function ScoreMethodologyPanel({ result }: ScoreMethodologyPanelProps) {
             <BreakdownRow label="Diversity" value={breakdown.confidence.diversityScore} max={25} tone="from-emerald-500 to-blue-500" />
             <BreakdownRow label="Reliability" value={breakdown.confidence.reliabilityScore} max={25} tone="from-sky-500 to-blue-500" />
             <BreakdownRow label="Report support" value={breakdown.confidence.reportSupport} max={15} tone="from-amber-500 to-yellow-500" />
-            <BreakdownRow label="Consistency" value={breakdown.confidence.consistencyScore} max={10} tone="from-teal-500 to-emerald-500" />
+            <BreakdownRow label="Source agreement" value={breakdown.confidence.consistencyScore} max={10} tone="from-teal-500 to-emerald-500" />
           </div>
           <p className="mt-4 text-sm leading-6 text-[#596662]">
             {breakdown.confidence.appliedCap}

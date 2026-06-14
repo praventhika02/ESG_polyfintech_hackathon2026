@@ -24,19 +24,16 @@ type Decision = {
   tone: string;
   icon: LucideIcon;
   nextSteps: string[];
-  message: string;
   changeTrigger: string;
 };
 
-function decisionFor(classification: Classification, companyName: string): Decision {
+function decisionFor(classification: Classification): Decision {
   switch (classification) {
     case "Early Alpha Opportunity":
       return {
         label: "Act Early",
         tone: "border-emerald-200 bg-emerald-100 text-emerald-800",
         icon: TrendingUp,
-        message:
-          "Transformation signals are stronger than current market recognition, creating a potential early-entry window.",
         changeTrigger:
           "Formal ESG rating upgrades or heavy analyst coverage would reduce the alpha gap.",
         nextSteps: [
@@ -50,8 +47,6 @@ function decisionFor(classification: Classification, companyName: string): Decis
         label: "Monitor Closely",
         tone: "border-teal-200 bg-teal-100 text-teal-800",
         icon: Eye,
-        message:
-          "Transformation evidence is developing, but the recognition gap is not large enough for a strong early-alpha call.",
         changeTrigger:
           "More high-quality evidence or a wider recognition gap could upgrade this to Early Alpha Opportunity.",
         nextSteps: [
@@ -65,7 +60,6 @@ function decisionFor(classification: Classification, companyName: string): Decis
         label: "Already Priced In",
         tone: "border-amber-200 bg-amber-100 text-amber-800",
         icon: ShieldCheck,
-        message: `${companyName} shows ESG activity, but public recognition has already caught up, reducing the early-alpha window.`,
         changeTrigger:
           "New transformation signals without matching public recognition could reopen the alpha window.",
         nextSteps: [
@@ -79,8 +73,6 @@ function decisionFor(classification: Classification, companyName: string): Decis
         label: "Wait for Confirmation",
         tone: "border-violet-200 bg-violet-100 text-violet-800",
         icon: Hourglass,
-        message:
-          "Patent and hiring layers show early innovation activity, but public evidence is not yet strong enough.",
         changeTrigger:
           "Confirmed news, report disclosures, or high-reliability evidence could upgrade this to Emerging ESG Improver.",
         nextSteps: [
@@ -95,7 +87,6 @@ function decisionFor(classification: Classification, companyName: string): Decis
         label: "Avoid for Now",
         tone: "border-rose-200 bg-rose-100 text-rose-800",
         icon: AlertTriangle,
-        message: "The evidence is not yet strong enough for an investor action signal.",
         changeTrigger:
           "More consistent evidence across news, reports, jobs, and patents could move this into watchlist status.",
         nextSteps: [
@@ -107,8 +98,35 @@ function decisionFor(classification: Classification, companyName: string): Decis
   }
 }
 
+function verdictWhy(result: EsgScanResult) {
+  const gap = result.recognitionGap ?? 0;
+  const recognition = result.recognitionScore ?? 0;
+
+  if (result.classification === "Early Alpha Opportunity") {
+    return `${result.companyName} has Transformation Strength of ${result.transformationStrength}/100, Recognition Score of ${recognition}/100, and a positive gap of ${gap}. The evidence suggests change is moving faster than market recognition.`;
+  }
+
+  if (result.classification === "Emerging ESG Improver") {
+    return `${result.companyName} shows a developing transformation signal with a ${gap}-point recognition gap and ${result.confidence}/100 confidence. The signal is promising, but not yet a decisive early-alpha call.`;
+  }
+
+  if (result.classification === "Already Recognised") {
+    return `${result.companyName} has Recognition Score of ${recognition}/100 against Transformation Strength of ${result.transformationStrength}/100. Public visibility has largely caught up, narrowing the alpha window.`;
+  }
+
+  if (result.classification === "Innovation Watchlist") {
+    return `${result.companyName} has limited live news recognition but active intelligence layers: ${result.patentSignalsFound ?? 0} patent queries and ${result.jobSignalsFound ?? 0} hiring queries. This is a monitoring signal, not a confirmed action call.`;
+  }
+
+  return `${result.companyName} currently has Transformation Strength of ${result.transformationStrength}/100 and Confidence of ${result.confidence}/100. Evidence quality or agreement is not strong enough for an investor action signal.`;
+}
+
+function evidenceSummary(result: EsgScanResult) {
+  return `${result.articlesFound ?? 0} news articles, ${result.patentSignalsFound ?? 0} patent intelligence queries, ${result.jobSignalsFound ?? 0} hiring intelligence queries, and ${result.verifiedReportsFound ?? result.reportSignalsFound ?? 0} verified report signals contributed to this verdict.`;
+}
+
 export function FinalVerdictPanel({ result }: FinalVerdictPanelProps) {
-  const decision = decisionFor(result.classification, result.companyName);
+  const decision = decisionFor(result.classification);
   const DecisionIcon = decision.icon;
   const confidenceLevel =
     result.confidence >= 80 ? "High" : result.confidence >= 60 ? "Medium" : "Low";
@@ -190,9 +208,22 @@ export function FinalVerdictPanel({ result }: FinalVerdictPanelProps) {
               {decision.label}
             </span>
           </div>
-          <p className="mt-4 text-sm leading-6 text-[#596662]">
-            {decision.message}
-          </p>
+          <div className="mt-4 grid gap-3">
+            <div className="rounded-xl border border-white/70 bg-white/52 p-3">
+              <p className="text-sm font-semibold text-[#17211e]">Why</p>
+              <p className="mt-1 text-sm leading-6 text-[#596662]">
+                {verdictWhy(result)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/70 bg-white/52 p-3">
+              <p className="text-sm font-semibold text-[#17211e]">
+                Evidence summary
+              </p>
+              <p className="mt-1 text-sm leading-6 text-[#596662]">
+                {evidenceSummary(result)}
+              </p>
+            </div>
+          </div>
 
           <div className="mt-5 grid gap-3">
             {decision.nextSteps.map((step) => (

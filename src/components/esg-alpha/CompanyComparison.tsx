@@ -9,6 +9,7 @@ import type { EsgScanResult } from "@/types/esg";
 type CompanyComparisonProps = {
   companies: MockCompany[];
   onScanCompany: (company: MockCompany, reportFileNames?: string[]) => Promise<EsgScanResult>;
+  onResults?: (results: EsgScanResult[]) => void;
 };
 
 const decisionTone: Record<string, string> = {
@@ -27,7 +28,7 @@ function investorDecision(classification: string) {
   return "Avoid for Now";
 }
 
-export function CompanyComparison({ companies, onScanCompany }: CompanyComparisonProps) {
+export function CompanyComparison({ companies, onScanCompany, onResults }: CompanyComparisonProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isComparing, setIsComparing] = useState(false);
   const [results, setResults] = useState<EsgScanResult[]>([]);
@@ -58,6 +59,7 @@ export function CompanyComparison({ companies, onScanCompany }: CompanyCompariso
         selectedCompanies.map((company) => onScanCompany(company, []))
       );
       setResults(comparisonResults);
+      onResults?.(comparisonResults);
     } finally {
       setIsComparing(false);
     }
