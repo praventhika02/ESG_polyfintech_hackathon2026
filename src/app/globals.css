@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4efe6;
+  --background: #eef5f0;
   --foreground: #17211e;
 }
 
@@ -16,11 +16,25 @@ html {
 body {
   min-height: 100vh;
   background:
-    radial-gradient(circle at 15% 10%, rgba(18, 184, 134, 0.18), transparent 34rem),
-    radial-gradient(circle at 85% 8%, rgba(197, 157, 68, 0.18), transparent 28rem),
-    linear-gradient(135deg, #f4efe6 0%, #e8f0ec 48%, #dfe8eb 100%);
+    linear-gradient(120deg, rgba(0, 196, 140, 0.12), transparent 32%),
+    linear-gradient(240deg, rgba(246, 183, 60, 0.11), transparent 30%),
+    linear-gradient(135deg, #f8faf7 0%, #eef5f0 48%, #e4eeee 100%);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+body::before {
+  pointer-events: none;
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(7, 59, 50, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(7, 59, 50, 0.045) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.82), transparent 82%);
+  animation: gridDrift 18s linear infinite;
 }
 
 button,
@@ -29,9 +43,11 @@ a {
 }
 
 .glass-panel {
-  border: 1px solid rgba(255, 255, 255, 0.58);
-  background: rgba(255, 255, 255, 0.48);
-  box-shadow: 0 24px 80px rgba(23, 33, 30, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.62), rgba(244, 250, 247, 0.42));
+  box-shadow:
+    0 24px 80px rgba(7, 59, 50, 0.11),
+    inset 0 1px 0 rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(22px);
 }
 
@@ -40,6 +56,15 @@ a {
     linear-gradient(rgba(30, 92, 82, 0.07) 1px, transparent 1px),
     linear-gradient(90deg, rgba(30, 92, 82, 0.07) 1px, transparent 1px);
   background-size: 34px 34px;
+}
+
+@keyframes gridDrift {
+  from {
+    background-position: 0 0, 0 0;
+  }
+  to {
+    background-position: 46px 46px, 46px 46px;
+  }
 }
 
 @media print {

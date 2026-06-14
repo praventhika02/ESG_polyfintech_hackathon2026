@@ -5,7 +5,6 @@ import { ArrowLeft, ArrowRight, RotateCcw, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AiInvestmentSummary } from "@/components/esg-alpha/AiInvestmentSummary";
 import { CompanySelector } from "@/components/esg-alpha/CompanySelector";
-import { CompanyComparison } from "@/components/esg-alpha/CompanyComparison";
 import { AnnualReportUpload } from "@/components/esg-alpha/AnnualReportUpload";
 import { EvidenceTimeline } from "@/components/esg-alpha/EvidenceTimeline";
 import { ExportReportActions } from "@/components/esg-alpha/ExportReportActions";
@@ -17,6 +16,7 @@ import { RecognitionGapVisual } from "@/components/esg-alpha/RecognitionGapVisua
 import { ScanButton } from "@/components/esg-alpha/ScanButton";
 import { ScanningPanel } from "@/components/esg-alpha/ScanningPanel";
 import { ScoreMethodologyPanel } from "@/components/esg-alpha/ScoreMethodologyPanel";
+import { SavedComparisonPanel } from "@/components/esg-alpha/SavedComparisonPanel";
 import { SignalSourcePanel } from "@/components/esg-alpha/SignalSourcePanel";
 import { demoCompanies, type CompanyId, type MockCompany } from "@/lib/esg/mockCompanies";
 import { mockResults } from "@/lib/esg/mockResults";
@@ -144,7 +144,6 @@ export default function Home() {
   const [scanResult, setScanResult] = useState<EsgScanResult | null>(null);
   const [reportFileNames, setReportFileNames] = useState<string[]>([]);
   const [savedAnalyses, setSavedAnalyses] = useState<SavedAnalysis[]>([]);
-  const [comparisonResults, setComparisonResults] = useState<EsgScanResult[]>([]);
   const [saveMessage, setSaveMessage] = useState("");
 
   const selectedCompany = useMemo(
@@ -363,11 +362,7 @@ export default function Home() {
                 onFileNamesChange={setReportFileNames}
                 selectedCompanyName={selectedCompany.name}
               />
-              <CompanyComparison
-                companies={demoCompanies}
-                onScanCompany={runCompanyScan}
-                onResults={setComparisonResults}
-              />
+              <SavedComparisonPanel />
               <SavedAnalysesPanel />
               <section className="glass-panel rounded-2xl p-5 sm:p-6">
                 <ScanButton isScanning={isScanning} onRunScan={handleRunScan} />
@@ -388,7 +383,6 @@ export default function Home() {
               <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
                 <MomentumMatrix
                   result={scanResult}
-                  comparisonResults={comparisonResults}
                 />
                 <AiInvestmentSummary result={scanResult} />
               </div>
@@ -474,7 +468,7 @@ export default function Home() {
                       <Save className="h-4 w-4" />
                       Save analysis locally
                     </button>
-                    <ExportReportActions />
+                    <ExportReportActions result={scanResult} />
                     <button
                       type="button"
                       onClick={handleNewScan}

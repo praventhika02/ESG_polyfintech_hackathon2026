@@ -20,6 +20,7 @@ export function ReportFindingsPanel({
   verifications = []
 }: ReportFindingsPanelProps) {
   const mismatches = verifications.filter((report) => report.status === "mismatch");
+  const themes = Array.from(new Set(findings.flatMap((finding) => finding.themesDetected)));
 
   if (findings.length === 0 && mismatches.length === 0) return null;
 
@@ -39,12 +40,26 @@ export function ReportFindingsPanel({
             Report Findings
           </p>
           <h2 className="mt-1 text-2xl font-semibold text-[#17211e]">
-            Verified PDF disclosure signals used in the scan.
+            Report impact on this scan.
           </h2>
-          <p className="mt-2 text-sm leading-6 text-[#596662]">
-            This MVP extracts ESG themes from verified PDF filenames and
-            disclosure cues. Full document text parsing can be connected as the
-            next module.
+        </div>
+      </div>
+
+      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-white/65 bg-white/48 p-4">
+          <p className="text-sm font-semibold text-[#17211e]">Verified reports</p>
+          <p className="mt-1 text-3xl font-semibold text-emerald-800">{findings.length}</p>
+        </div>
+        <div className="rounded-xl border border-white/65 bg-white/48 p-4">
+          <p className="text-sm font-semibold text-[#17211e]">Mismatches</p>
+          <p className="mt-1 text-3xl font-semibold text-rose-700">{mismatches.length}</p>
+        </div>
+        <div className="rounded-xl border border-white/65 bg-white/48 p-4">
+          <p className="text-sm font-semibold text-[#17211e]">Confidence impact</p>
+          <p className="mt-2 text-sm font-semibold text-[#596662]">
+            {findings.length > 0
+              ? "Verified disclosure evidence strengthened confidence."
+              : "No report boost applied."}
           </p>
         </div>
       </div>
@@ -60,7 +75,7 @@ export function ReportFindingsPanel({
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-700" />
                 <div>
                   <p className="text-sm font-semibold text-rose-900">
-                    {report.fileName}
+                    Mismatch excluded from score: {report.fileName}
                   </p>
                   <p className="mt-1 text-sm leading-6 text-rose-800">
                     {report.message}
@@ -72,7 +87,25 @@ export function ReportFindingsPanel({
         </div>
       ) : null}
 
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="rounded-xl border border-white/65 bg-white/42 p-4">
+        <p className="text-sm font-semibold text-[#17211e]">Themes detected</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {themes.length > 0 ? (
+            themes.map((theme) => (
+              <span
+                key={theme}
+                className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800"
+              >
+                {theme}
+              </span>
+            ))
+          ) : (
+            <span className="text-sm text-[#596662]">No verified themes detected.</span>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
         {findings.map((finding) => (
           <div
             key={finding.fileName}
@@ -112,13 +145,11 @@ export function ReportFindingsPanel({
               )}
             </div>
 
-            <div className="mt-4 space-y-2">
-              {finding.keyPhrases.slice(0, 3).map((phrase) => (
-                <p key={phrase} className="text-sm leading-6 text-[#596662]">
-                  {phrase}
-                </p>
-              ))}
-            </div>
+            <p className="mt-3 text-sm font-semibold text-[#596662]">
+              {finding.themesDetected.length > 0
+                ? "Verified disclosure evidence included in score."
+                : "Verified report included; no explicit ESG filename theme detected."}
+            </p>
           </div>
         ))}
       </div>

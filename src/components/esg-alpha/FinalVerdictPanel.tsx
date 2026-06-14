@@ -3,10 +3,8 @@
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
-  ArrowRight,
   CheckCircle2,
   Eye,
-  Gauge,
   Hourglass,
   ShieldCheck,
   Target,
@@ -125,6 +123,27 @@ function evidenceSummary(result: EsgScanResult) {
   return `${result.articlesFound ?? 0} news articles, ${result.patentSignalsFound ?? 0} patent intelligence queries, ${result.jobSignalsFound ?? 0} hiring intelligence queries, and ${result.verifiedReportsFound ?? result.reportSignalsFound ?? 0} verified report signals contributed to this verdict.`;
 }
 
+function shortStand(result: EsgScanResult) {
+  const gap = result.recognitionGap ?? 0;
+
+  if (result.classification === "Early Alpha Opportunity") {
+    return `Act early only after due diligence — transformation is ${gap} points ahead of recognition.`;
+  }
+  if (result.classification === "Emerging ESG Improver") {
+    return `Monitor closely — the gap is positive, but confirmation still matters.`;
+  }
+  if (result.classification === "Already Recognised") {
+    return "Be valuation-aware — public recognition has already caught up.";
+  }
+  if (result.classification === "Innovation Watchlist") {
+    return "Wait for confirmation — early intelligence exists, but public evidence is limited.";
+  }
+  if (gap < 0) {
+    return "Do not act yet — recognition is already ahead of transformation.";
+  }
+  return "Do not act yet — the evidence is not strong enough for an action signal.";
+}
+
 export function FinalVerdictPanel({ result }: FinalVerdictPanelProps) {
   const decision = decisionFor(result.classification);
   const DecisionIcon = decision.icon;
@@ -132,14 +151,17 @@ export function FinalVerdictPanel({ result }: FinalVerdictPanelProps) {
     result.confidence >= 80 ? "High" : result.confidence >= 60 ? "Medium" : "Low";
 
   return (
-    <section className="glass-panel rounded-2xl p-5 sm:p-6">
+    <section className="glass-panel rounded-2xl p-5 sm:p-7">
       <div className="mb-5">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-900/60">
           Final Investor Verdict
         </p>
-        <h2 className="mt-1 text-2xl font-semibold text-[#17211e]">
-          Clear action signal from the ESG Alpha Gap scan.
+        <h2 className="mt-1 text-4xl font-semibold tracking-normal text-[#17211e]">
+          Decision: {decision.label}
         </h2>
+        <p className="mt-3 max-w-3xl text-base font-medium leading-7 text-[#4c5b56]">
+          {shortStand(result)}
+        </p>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
@@ -153,11 +175,14 @@ export function FinalVerdictPanel({ result }: FinalVerdictPanelProps) {
             <Target className="h-5 w-5 text-amber-200" />
           </div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100/80">
-            Verdict status
+            Decision signal
           </p>
-          <h3 className="mt-2 text-2xl font-semibold leading-tight">
-            {result.classification}
+          <h3 className="mt-2 text-4xl font-semibold leading-tight">
+            {decision.label}
           </h3>
+          <p className="mt-3 text-sm leading-6 text-emerald-50/72">
+            {result.classification}
+          </p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl bg-white/10 p-3">
               <p className="text-xs text-emerald-100/70">Alpha Window</p>
@@ -195,10 +220,10 @@ export function FinalVerdictPanel({ result }: FinalVerdictPanelProps) {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-900/60">
-                Investor decision
+                Why this stand
               </p>
-              <h3 className="mt-1 text-3xl font-semibold text-[#17211e]">
-                {decision.label}
+              <h3 className="mt-1 text-2xl font-semibold text-[#17211e]">
+                Evidence-backed decision
               </h3>
             </div>
             <span
@@ -225,7 +250,10 @@ export function FinalVerdictPanel({ result }: FinalVerdictPanelProps) {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3">
+          <p className="mt-5 text-sm font-semibold uppercase tracking-[0.14em] text-emerald-900/60">
+            Next steps
+          </p>
+          <div className="mt-3 grid gap-3">
             {decision.nextSteps.map((step) => (
               <div
                 key={step}
@@ -247,31 +275,15 @@ export function FinalVerdictPanel({ result }: FinalVerdictPanelProps) {
         </motion.div>
       </div>
 
-      <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
-        <div className="flex gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/70 text-emerald-800">
-            <Gauge className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-[#17211e]">
-              What ESG Alpha Gap solves
-            </p>
-            <p className="mt-2 text-sm leading-6 text-[#596662]">
-              Traditional ESG tools tell investors who looks good today. ESG
-              Alpha Gap focuses on timing: who is changing, how much the market
-              has recognised it, and whether an alpha window still exists.
-            </p>
-            <p className="mt-2 text-sm font-semibold leading-6 text-[#465651]">
-              Best use case: finding companies where transformation evidence is
-              ahead of market recognition.
-            </p>
-            <p className="mt-2 text-xs font-semibold leading-5 text-emerald-900/75">
-              Verdicts are generated from live evidence layers and verified
-              uploaded documents. No company-specific scoring bias is applied.
-            </p>
-          </div>
-          <ArrowRight className="mt-2 hidden h-5 w-5 shrink-0 text-emerald-700 sm:block" />
-        </div>
+      <div className="mt-5 rounded-xl border border-white/65 bg-white/45 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-900/60">
+          Disclaimer
+        </p>
+        <p className="mt-2 text-sm leading-6 text-[#596662]">
+          This supports due diligence and is not investment advice. Verdicts are
+          generated from live evidence layers and verified uploaded documents.
+          No company-specific scoring bias is applied.
+        </p>
       </div>
     </section>
   );
