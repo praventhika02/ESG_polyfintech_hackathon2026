@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Calculator, ChevronDown } from "lucide-react";
+import { ArrowRight, Calculator, ChevronDown, Minus } from "lucide-react";
 import type { EsgScanResult } from "@/types/esg";
 
 type ScoreMethodologyPanelProps = {
@@ -88,7 +88,7 @@ export function ScoreMethodologyPanel({ result }: ScoreMethodologyPanelProps) {
         </span>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="grid gap-3 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] xl:items-stretch">
         {[
           {
             title: "1. Transformation Strength",
@@ -108,14 +108,41 @@ export function ScoreMethodologyPanel({ result }: ScoreMethodologyPanelProps) {
             value: `${breakdown.recognitionGap.transformationStrength} - ${breakdown.recognitionGap.recognitionScore} = ${breakdown.recognitionGap.gap}`,
             inputs: "Transformation Strength minus Recognition Score"
           }
-        ].map((step) => (
-          <div key={step.title} className="rounded-xl border border-white/65 bg-white/48 p-4">
-            <p className="text-sm font-semibold text-[#143b34]">{step.title}</p>
-            <p className="mt-2 text-2xl font-semibold text-[#17211e]">{step.value}</p>
-            <p className="mt-2 text-sm font-semibold text-[#4c5b56]">{step.question}</p>
-            <p className="mt-1 text-sm leading-6 text-[#65726e]">{step.inputs}</p>
-          </div>
+        ].map((step, index) => (
+          <>
+            <div key={step.title} className="rounded-xl border border-white/10 bg-white/[0.045] p-4">
+              <p className="text-sm font-semibold text-mint">{step.title}</p>
+              <p className="mt-2 text-3xl font-semibold text-foreground">{step.value}</p>
+              <p className="mt-2 text-sm font-semibold text-foreground">{step.question}</p>
+              <p className="mt-1 text-sm leading-6 text-muted">{step.inputs}</p>
+            </div>
+            {index === 0 ? (
+              <div className="hidden items-center justify-center xl:flex">
+                <Minus className="h-6 w-6 text-gold" />
+              </div>
+            ) : index === 1 ? (
+              <div className="hidden items-center justify-center xl:flex">
+                <span className="text-xl font-semibold text-gold">=</span>
+              </div>
+            ) : index === 2 ? (
+              <div className="hidden items-center justify-center xl:flex">
+                <ArrowRight className="h-6 w-6 text-gold" />
+              </div>
+            ) : null}
+          </>
         ))}
+        <div className="rounded-xl border border-gold/20 bg-gold/10 p-4">
+          <p className="text-sm font-semibold text-gold">4. Alpha Window</p>
+          <p className="mt-2 text-3xl font-semibold text-foreground">
+            {breakdown.alphaWindow.months} mo
+          </p>
+          <p className="mt-2 text-sm font-semibold text-foreground">
+            Investor timing window.
+          </p>
+          <p className="mt-1 text-sm leading-6 text-muted">
+            Leads to {result.classification}.
+          </p>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">

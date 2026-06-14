@@ -1,29 +1,47 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, RotateCcw, Save } from "lucide-react";
+import {
+  Archive,
+  BarChart3,
+  BrainCircuit,
+  Calculator,
+  FileSearch,
+  HomeIcon,
+  RotateCcw,
+  Save,
+  Target
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { AiInvestmentSummary } from "@/components/esg-alpha/AiInvestmentSummary";
-import { CompanySelector } from "@/components/esg-alpha/CompanySelector";
 import { AnnualReportUpload } from "@/components/esg-alpha/AnnualReportUpload";
-import { EvidenceTimeline } from "@/components/esg-alpha/EvidenceTimeline";
+import { CompanySelector } from "@/components/esg-alpha/CompanySelector";
+import { EvidenceBrowser } from "@/components/esg-alpha/EvidenceBrowser";
+import { ExecutiveBriefCard } from "@/components/esg-alpha/ExecutiveBriefCard";
 import { ExportReportActions } from "@/components/esg-alpha/ExportReportActions";
 import { FinalVerdictPanel } from "@/components/esg-alpha/FinalVerdictPanel";
 import { HeroSection } from "@/components/esg-alpha/HeroSection";
 import { MomentumMatrix } from "@/components/esg-alpha/MomentumMatrix";
-import { ReportFindingsPanel } from "@/components/esg-alpha/ReportFindingsPanel";
 import { RecognitionGapVisual } from "@/components/esg-alpha/RecognitionGapVisual";
+import { ReportFindingsPanel } from "@/components/esg-alpha/ReportFindingsPanel";
+import { SavedComparisonPanel } from "@/components/esg-alpha/SavedComparisonPanel";
 import { ScanButton } from "@/components/esg-alpha/ScanButton";
 import { ScanningPanel } from "@/components/esg-alpha/ScanningPanel";
 import { ScoreMethodologyPanel } from "@/components/esg-alpha/ScoreMethodologyPanel";
-import { SavedComparisonPanel } from "@/components/esg-alpha/SavedComparisonPanel";
 import { SignalSourcePanel } from "@/components/esg-alpha/SignalSourcePanel";
 import { demoCompanies, type CompanyId, type MockCompany } from "@/lib/esg/mockCompanies";
 import { mockResults } from "@/lib/esg/mockResults";
 import { verifyReportFileNames } from "@/lib/esg/reportVerification";
 import type { EsgScanResult, EvidenceImpact, EvidenceSourceType } from "@/types/esg";
 
-type ActiveStage = "select" | "analyse" | "results" | "decision";
+type ActiveView =
+  | "scan"
+  | "overview"
+  | "matrix"
+  | "methodology"
+  | "evidence"
+  | "decision"
+  | "saved";
 
 type SavedAnalysis = {
   id: string;
@@ -31,44 +49,39 @@ type SavedAnalysis = {
   result: EsgScanResult;
 };
 
-const stageLabels: { id: ActiveStage; label: string }[] = [
-  { id: "select", label: "Select" },
-  { id: "analyse", label: "Analyse" },
-  { id: "results", label: "Results" },
-  { id: "decision", label: "Decision" }
-];
-
 const savedAnalysisKey = "esg-alpha-gap-saved-analyses";
+
+const navItems: { id: ActiveView; label: string; icon: LucideIcon }[] = [
+  { id: "scan", label: "Scan", icon: HomeIcon },
+  { id: "overview", label: "Overview", icon: BrainCircuit },
+  { id: "matrix", label: "Matrix", icon: BarChart3 },
+  { id: "methodology", label: "Methodology", icon: Calculator },
+  { id: "evidence", label: "Evidence", icon: FileSearch },
+  { id: "decision", label: "Decision", icon: Target },
+  { id: "saved", label: "Saved", icon: Archive }
+];
 
 function investorActionForClassification(classification: string) {
   if (classification === "Already Recognised") {
     return "ESG signals are strong, but public recognition is already high. The alpha window may be narrowing.";
   }
-
   if (classification === "Early Alpha Opportunity") {
     return "Strong transformation evidence is emerging while public recognition remains incomplete. This may indicate an early-entry window.";
   }
-
   if (classification === "Emerging ESG Improver") {
     return "ESG transformation evidence is developing across multiple sources. Continue monitoring for stronger recognition lag.";
   }
-
   if (classification === "Innovation Watchlist") {
     return "Patent and hiring signals suggest early innovation activity, but live news recognition is limited. Monitor for confirmation.";
   }
-
   if (classification === "Evidence Watchlist" || classification === "Watchlist") {
     return "Current evidence is not strong enough for an investor action signal. More signals are needed.";
   }
-
   return null;
 }
 
 function normaliseSourceType(sourceType: string): EvidenceSourceType {
-  if (sourceType === "Report") {
-    return "Reports";
-  }
-
+  if (sourceType === "Report") return "Reports";
   if (
     sourceType === "News" ||
     sourceType === "Jobs" ||
@@ -80,17 +93,12 @@ function normaliseSourceType(sourceType: string): EvidenceSourceType {
   ) {
     return sourceType;
   }
-
   return "News";
 }
 
 function impactFromText(text: string): EvidenceImpact {
   const lowered = text.toLowerCase();
-
-  if (lowered.includes("risk") || lowered.includes("limited")) {
-    return "Neutral";
-  }
-
+  if (lowered.includes("risk") || lowered.includes("limited")) return "Neutral";
   return "Positive";
 }
 
@@ -136,10 +144,8 @@ function demoFallbackResult(companyId: CompanyId, companyName: string): EsgScanR
 }
 
 export default function Home() {
-  console.log("[UI] demoCompanies count:", demoCompanies.length);
-
+  const [activeView, setActiveView] = useState<ActiveView>("scan");
   const [selectedCompanyId, setSelectedCompanyId] = useState<CompanyId>("sembcorp");
-  const [activeStage, setActiveStage] = useState<ActiveStage>("select");
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<EsgScanResult | null>(null);
   const [reportFileNames, setReportFileNames] = useState<string[]>([]);
@@ -160,9 +166,7 @@ export default function Home() {
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(savedAnalysisKey);
-      if (saved) {
-        setSavedAnalyses(JSON.parse(saved) as SavedAnalysis[]);
-      }
+      if (saved) setSavedAnalyses(JSON.parse(saved) as SavedAnalysis[]);
     } catch (error) {
       console.error("[UI] Failed to load saved analyses", error);
     }
@@ -171,23 +175,18 @@ export default function Home() {
   function handleSelect(companyId: CompanyId) {
     setSelectedCompanyId(companyId);
     setScanResult(null);
-    setActiveStage("select");
+    setActiveView("scan");
     setSaveMessage("");
   }
 
   async function runCompanyScan(company: MockCompany, reports = reportFileNames) {
-    console.log("[Scan UI] Starting scan", company.name);
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => {
-      controller.abort();
-    }, 15000);
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
 
     try {
       const response = await fetch("/api/esg/scan", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           companyId: company.id,
           companyName: company.name,
@@ -196,36 +195,24 @@ export default function Home() {
         signal: controller.signal
       });
 
-      if (!response.ok) {
-        throw new Error(`Scan failed: ${response.status}`);
-      }
-
-      const data = (await response.json()) as EsgScanResult;
-
-      console.log("[Scan UI] Received scan result", data);
-      return data;
+      if (!response.ok) throw new Error(`Scan failed: ${response.status}`);
+      return (await response.json()) as EsgScanResult;
     } catch (error) {
       console.error("[Scan UI] Scan failed:", error);
       return demoFallbackResult(company.id, company.name);
     } finally {
       window.clearTimeout(timeout);
-      console.log("[Scan UI] Scan finished");
     }
   }
 
   async function handleRunScan() {
-    if (!selectedCompany) {
-      return;
-    }
-
     setIsScanning(true);
     setScanResult(null);
-    setActiveStage("analyse");
 
     try {
       const result = await runCompanyScan(selectedCompany, reportFileNames);
       setScanResult(result);
-      setActiveStage("results");
+      setActiveView("overview");
     } finally {
       setIsScanning(false);
     }
@@ -234,13 +221,12 @@ export default function Home() {
   function handleNewScan() {
     setScanResult(null);
     setIsScanning(false);
-    setActiveStage("select");
+    setActiveView("scan");
     setSaveMessage("");
   }
 
   function handleSaveAnalysis() {
     if (!scanResult) return;
-
     const nextSaved: SavedAnalysis[] = [
       {
         id: `${scanResult.companyId}-${Date.now()}`,
@@ -252,81 +238,77 @@ export default function Home() {
 
     setSavedAnalyses(nextSaved);
     window.localStorage.setItem(savedAnalysisKey, JSON.stringify(nextSaved));
-    setSaveMessage("Analysis saved locally on this browser.");
+    setSaveMessage("Saved locally.");
   }
 
-  function handleLoadSaved(saved: SavedAnalysis) {
+  function loadSaved(saved: SavedAnalysis) {
     const company = demoCompanies.find((item) => item.id === saved.result.companyId);
-    if (company) {
-      setSelectedCompanyId(company.id);
-    }
+    if (company) setSelectedCompanyId(company.id);
     setScanResult(saved.result);
-    setActiveStage("results");
-    setSaveMessage("");
+    setActiveView("overview");
   }
 
-  function StageProgress() {
-    const activeIndex = stageLabels.findIndex((stage) => stage.id === activeStage);
-
+  function AppNav() {
     return (
-      <div className="glass-panel rounded-2xl p-3">
-        <div className="grid gap-2 sm:grid-cols-4">
-          {stageLabels.map((stage, index) => {
-            const isActive = stage.id === activeStage;
-            const isComplete = index < activeIndex;
+      <aside className="glass-panel sticky top-4 z-20 rounded-2xl p-3 lg:min-h-[calc(100vh-2rem)]">
+        <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mint">
+            ESG Alpha Gap
+          </p>
+          <p className="mt-1 text-sm text-muted">AI investment terminal</p>
+        </div>
+        <nav className="grid gap-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = item.id === activeView;
+            const disabled = item.id !== "scan" && item.id !== "saved" && !scanResult;
 
             return (
               <button
-                key={stage.id}
+                key={item.id}
                 type="button"
-                disabled={stage.id === "analyse" || (stage.id !== "select" && !scanResult)}
-                onClick={() => setActiveStage(stage.id)}
-                className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                disabled={disabled}
+                onClick={() => setActiveView(item.id)}
+                className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
                   isActive
-                    ? "border-emerald-300 bg-[#143b34] text-white"
-                    : isComplete
-                    ? "border-emerald-100 bg-emerald-50 text-emerald-900"
-                    : "border-white/65 bg-white/50 text-[#596662]"
-                } disabled:cursor-not-allowed disabled:opacity-60`}
+                    ? "border-mint/35 bg-mint/15 text-mint shadow-[0_0_24px_rgba(0,229,168,0.12)]"
+                    : "border-white/10 bg-white/[0.035] text-muted hover:bg-white/[0.07] hover:text-foreground"
+                } disabled:cursor-not-allowed disabled:opacity-40`}
               >
-                {index + 1}. {stage.label}
+                <Icon className="h-4 w-4" />
+                {item.label}
               </button>
             );
           })}
-        </div>
-      </div>
+        </nav>
+      </aside>
     );
   }
 
-  function SavedAnalysesPanel() {
+  function SavedPreview() {
     if (savedAnalyses.length === 0) return null;
-
     return (
       <section className="glass-panel rounded-2xl p-5 sm:p-6">
         <div className="mb-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-900/60">
-            Local saved analyses
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mint">
+            Saved analyses
           </p>
-          <h2 className="mt-1 text-xl font-semibold text-[#17211e]">
-            Reopen recent scans stored in this browser.
+          <h2 className="mt-1 text-xl font-semibold text-foreground">
+            Recent local scans.
           </h2>
         </div>
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-          {savedAnalyses.map((saved) => (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {savedAnalyses.slice(0, 4).map((saved) => (
             <button
               key={saved.id}
               type="button"
-              onClick={() => handleLoadSaved(saved)}
-              className="rounded-xl border border-white/65 bg-white/48 p-4 text-left transition hover:bg-white/72"
+              onClick={() => loadSaved(saved)}
+              className="rounded-xl border border-white/10 bg-white/[0.045] p-4 text-left transition hover:bg-white/[0.075]"
             >
-              <p className="font-semibold text-[#17211e]">
-                {saved.result.companyName}
-              </p>
-              <p className="mt-1 text-sm text-[#596662]">
-                {saved.result.classification}
-              </p>
-              <p className="mt-3 text-xs font-semibold text-emerald-800">
-                Gap {saved.result.recognitionGap ?? 0} · {saved.result.alphaWindowMonths} months
+              <p className="font-semibold text-foreground">{saved.result.companyName}</p>
+              <p className="mt-1 text-sm text-muted">{saved.result.classification}</p>
+              <p className="mt-3 text-xs font-semibold text-mint">
+                Gap {saved.result.recognitionGap ?? 0} - {saved.result.alphaWindowMonths} months
               </p>
             </button>
           ))}
@@ -337,18 +319,17 @@ export default function Home() {
 
   return (
     <main className="min-h-screen px-4 py-5 sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 sm:gap-6">
-        <StageProgress />
+      <div className="mx-auto grid max-w-[1500px] gap-5 lg:grid-cols-[240px_1fr]">
+        <AppNav />
 
         <AnimatePresence mode="wait">
-          {activeStage === "select" ? (
+          {activeView === "scan" ? (
             <motion.div
-              key="select"
-              className="grid gap-5 sm:gap-6"
+              key="scan"
+              className="grid gap-5"
               initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1 }}
+              animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
             >
               <HeroSection />
               <CompanySelector
@@ -362,36 +343,17 @@ export default function Home() {
                 onFileNamesChange={setReportFileNames}
                 selectedCompanyName={selectedCompany.name}
               />
-              <SavedComparisonPanel />
-              <SavedAnalysesPanel />
+              <SavedPreview />
               <section className="glass-panel rounded-2xl p-5 sm:p-6">
                 <ScanButton isScanning={isScanning} onRunScan={handleRunScan} />
               </section>
+              {isScanning ? <ScanningPanel company={selectedCompany} /> : null}
             </motion.div>
-          ) : activeStage === "analyse" ? (
-            <ScanningPanel key="scan" company={selectedCompany} />
-          ) : activeStage === "results" && scanResult ? (
-            <motion.div
-              key="results"
-              className="grid gap-5 sm:gap-6"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-            >
+          ) : activeView === "overview" && scanResult ? (
+            <motion.div key="overview" className="grid gap-5" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
               <RecognitionGapVisual result={scanResult} />
-              <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-                <MomentumMatrix
-                  result={scanResult}
-                />
-                <AiInvestmentSummary result={scanResult} />
-              </div>
-              <ReportFindingsPanel
-                findings={scanResult.reportFindings}
-                verifications={scanResult.reportVerifications}
-              />
-              <EvidenceTimeline events={scanResult.evidenceTimeline} />
               <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+                <ExecutiveBriefCard result={scanResult} />
                 <SignalSourcePanel
                   providerUsed={scanResult.providerUsed}
                   dataMode={scanResult.dataMode}
@@ -405,74 +367,58 @@ export default function Home() {
                   queryUsed={scanResult.queryUsed}
                   generatedAt={scanResult.generatedAt}
                 />
-                <ScoreMethodologyPanel result={scanResult} />
               </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+              <div className="flex justify-end">
                 <button
                   type="button"
-                  onClick={handleNewScan}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/70 bg-white/58 px-4 py-3 text-sm font-semibold text-[#143b34] transition hover:bg-white/80"
+                  onClick={() => setActiveView("decision")}
+                  className="rounded-xl bg-mint px-5 py-3 text-sm font-semibold text-[#05201c] transition hover:bg-cyan-300"
                 >
-                  <RotateCcw className="h-4 w-4" />
-                  New Scan
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveStage("decision")}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#143b34] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#0f2f29]"
-                >
-                  Continue to Decision
-                  <ArrowRight className="h-4 w-4" />
+                  Open Decision
                 </button>
               </div>
             </motion.div>
-          ) : activeStage === "decision" && scanResult ? (
-            <motion.div
-              key="decision"
-              className="grid gap-5 sm:gap-6"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-            >
+          ) : activeView === "matrix" && scanResult ? (
+            <motion.div key="matrix" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              <MomentumMatrix result={scanResult} />
+            </motion.div>
+          ) : activeView === "methodology" && scanResult ? (
+            <motion.div key="methodology" className="grid gap-5" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              <ScoreMethodologyPanel result={scanResult} />
+              <ReportFindingsPanel findings={scanResult.reportFindings} verifications={scanResult.reportVerifications} />
+            </motion.div>
+          ) : activeView === "evidence" && scanResult ? (
+            <motion.div key="evidence" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              <EvidenceBrowser events={scanResult.evidenceTimeline} />
+            </motion.div>
+          ) : activeView === "decision" && scanResult ? (
+            <motion.div key="decision" className="grid gap-5" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
               <FinalVerdictPanel result={scanResult} />
               <div className="glass-panel rounded-2xl p-5 sm:p-6">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-900/60">
-                      Decision workspace
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mint">
+                      Decision actions
                     </p>
-                    <h2 className="mt-1 text-xl font-semibold text-[#17211e]">
-                      Export, save, or return to the evidence view.
+                    <h2 className="mt-1 text-xl font-semibold text-foreground">
+                      Save or export the decision report.
                     </h2>
-                    {saveMessage ? (
-                      <p className="mt-2 text-sm font-semibold text-emerald-800">
-                        {saveMessage}
-                      </p>
-                    ) : null}
+                    {saveMessage ? <p className="mt-2 text-sm font-semibold text-mint">{saveMessage}</p> : null}
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <button
                       type="button"
-                      onClick={() => setActiveStage("results")}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/70 bg-white/58 px-4 py-3 text-sm font-semibold text-[#143b34] transition hover:bg-white/80"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                      Back to Results
-                    </button>
-                    <button
-                      type="button"
                       onClick={handleSaveAnalysis}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-mint/20 bg-mint/10 px-4 py-3 text-sm font-semibold text-mint transition hover:bg-mint/15"
                     >
                       <Save className="h-4 w-4" />
-                      Save analysis locally
+                      Save Analysis
                     </button>
                     <ExportReportActions result={scanResult} />
                     <button
                       type="button"
                       onClick={handleNewScan}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#143b34] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#0f2f29]"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/8 px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-white/12"
                     >
                       <RotateCcw className="h-4 w-4" />
                       New Scan
@@ -480,6 +426,10 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+            </motion.div>
+          ) : activeView === "saved" ? (
+            <motion.div key="saved" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              <SavedComparisonPanel />
             </motion.div>
           ) : (
             <motion.section
@@ -489,8 +439,8 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
             >
-              <p className="text-sm font-medium text-[#596662]">
-                Select a company and run the ESG Alpha Gap scan.
+              <p className="text-sm font-medium text-muted">
+                Run a scan to unlock this view.
               </p>
             </motion.section>
           )}

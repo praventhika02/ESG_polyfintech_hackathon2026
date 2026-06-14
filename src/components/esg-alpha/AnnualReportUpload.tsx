@@ -53,20 +53,20 @@ export function AnnualReportUpload({
             <FileText className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-900/60">
-              Optional report signal
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mint">
+              Secure document verification
             </p>
-            <h2 className="mt-1 text-xl font-semibold text-[#17211e]">
-              Upload sustainability / annual report PDFs
+            <h2 className="mt-1 text-xl font-semibold text-foreground">
+              Upload ESG disclosure PDFs
             </h2>
-            <p className="mt-2 text-sm leading-6 text-[#596662]">
-              Upload a company report to strengthen transformation evidence.
+            <p className="mt-2 text-sm leading-6 text-muted">
+              Verified company reports can strengthen confidence.
             </p>
           </div>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-emerald-900/10 bg-white/58 px-4 py-2 text-sm font-semibold text-[#143b34] shadow-sm transition hover:border-emerald-500/40 hover:bg-white/76">
+          <label className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-mint/20 bg-mint/10 px-4 py-2 text-sm font-semibold text-mint shadow-sm transition hover:bg-mint/15">
             <Upload className="h-4 w-4" />
             Choose PDFs
             <input
@@ -85,7 +85,7 @@ export function AnnualReportUpload({
               {fileNames.map((fileName) => (
                 <span key={fileName} className="flex max-w-full flex-col gap-1">
                   <span
-                    className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/70 bg-white/58 px-3 py-1.5 text-sm font-medium text-[#42534d]"
+                    className="inline-flex max-w-full items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2 text-sm font-medium text-foreground"
                     title={fileName}
                   >
                     <span className="max-w-52 truncate">{fileName}</span>
@@ -101,17 +101,15 @@ export function AnnualReportUpload({
                     <button
                       type="button"
                       onClick={() => removeFile(fileName)}
-                      className="rounded-full p-0.5 text-[#697772] transition hover:bg-white/80 hover:text-[#143b34]"
+                      className="rounded-full p-0.5 text-muted transition hover:bg-white/10 hover:text-mint"
                       aria-label={`Remove ${fileName}`}
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </span>
                   {verificationFor(fileName)?.status === "mismatch" ? (
-                    <span className="max-w-md rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-800">
-                      Selected company is {selectedCompanyName}, but this file
-                      does not appear to match company aliases. Please upload
-                      the correct company report.
+                    <span className="max-w-md rounded-xl border border-rose-300/20 bg-rose-400/10 px-3 py-2 text-xs leading-5 text-rose-200">
+                      Cross-company report mismatch excluded from scoring for {selectedCompanyName}.
                     </span>
                   ) : null}
                 </span>
@@ -120,14 +118,14 @@ export function AnnualReportUpload({
                 <button
                   type="button"
                   onClick={() => onFileNamesChange([])}
-                  className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+                  className="rounded-full border border-gold/25 bg-gold/10 px-3 py-1.5 text-sm font-semibold text-gold transition hover:bg-gold/15"
                 >
                   Clear all
                 </button>
               ) : null}
             </div>
           ) : (
-            <span className="text-sm text-[#697772]">No reports selected</span>
+            <span className="text-sm text-muted">No reports selected</span>
           )}
         </div>
       </div>

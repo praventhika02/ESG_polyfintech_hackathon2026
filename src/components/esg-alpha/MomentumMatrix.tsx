@@ -144,6 +144,14 @@ export function MomentumMatrix({ result, comparisonResults = [] }: MomentumMatri
           {currentQuadrant}: {quadrantMeaning[currentQuadrant]}
         </span>
       </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {Object.entries(quadrantMeaning).map(([label, meaning]) => (
+          <div key={label} className="rounded-xl border border-white/10 bg-white/[0.045] p-3">
+            <p className="text-sm font-semibold text-foreground">{label}</p>
+            <p className="mt-1 text-xs font-semibold text-mint">{meaning}</p>
+          </div>
+        ))}
+      </div>
     </motion.section>
   );
 }

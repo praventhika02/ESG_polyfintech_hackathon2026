@@ -90,7 +90,7 @@ export function ExportReportActions({ result }: ExportReportActionsProps) {
         className="inline-flex items-center gap-2 rounded-xl bg-[#143b34] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0f2f29]"
       >
         <Download className="h-4 w-4" />
-        Export ESG Alpha Report
+        Download Report
       </button>
     </div>
   );
