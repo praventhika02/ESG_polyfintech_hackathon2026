@@ -8,6 +8,7 @@ import {
   Calculator,
   FileSearch,
   HomeIcon,
+  Lightbulb,
   RotateCcw,
   Save,
   Target
@@ -21,6 +22,7 @@ import { ExecutiveBriefCard } from "@/components/esg-alpha/ExecutiveBriefCard";
 import { ExportReportActions } from "@/components/esg-alpha/ExportReportActions";
 import { FinalVerdictPanel } from "@/components/esg-alpha/FinalVerdictPanel";
 import { HeroSection } from "@/components/esg-alpha/HeroSection";
+import { InsightsView } from "@/components/esg-alpha/InsightsView";
 import { MomentumMatrix } from "@/components/esg-alpha/MomentumMatrix";
 import { RecognitionGapVisual } from "@/components/esg-alpha/RecognitionGapVisual";
 import { ReportFindingsPanel } from "@/components/esg-alpha/ReportFindingsPanel";
@@ -38,6 +40,7 @@ type ActiveView =
   | "scan"
   | "overview"
   | "matrix"
+  | "insights"
   | "methodology"
   | "evidence"
   | "decision"
@@ -55,8 +58,9 @@ const navItems: { id: ActiveView; label: string; icon: LucideIcon }[] = [
   { id: "scan", label: "Scan", icon: HomeIcon },
   { id: "overview", label: "Overview", icon: BrainCircuit },
   { id: "matrix", label: "Matrix", icon: BarChart3 },
-  { id: "methodology", label: "Methodology", icon: Calculator },
+  { id: "insights", label: "Insights", icon: Lightbulb },
   { id: "evidence", label: "Evidence", icon: FileSearch },
+  { id: "methodology", label: "Methodology", icon: Calculator },
   { id: "decision", label: "Decision", icon: Target },
   { id: "saved", label: "Saved", icon: Archive }
 ];
@@ -381,6 +385,10 @@ export default function Home() {
           ) : activeView === "matrix" && scanResult ? (
             <motion.div key="matrix" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
               <MomentumMatrix result={scanResult} />
+            </motion.div>
+          ) : activeView === "insights" && scanResult ? (
+            <motion.div key="insights" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              <InsightsView result={scanResult} />
             </motion.div>
           ) : activeView === "methodology" && scanResult ? (
             <motion.div key="methodology" className="grid gap-5" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>

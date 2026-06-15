@@ -93,9 +93,9 @@ export function AnnualReportUpload({
                       className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badgeTone(verificationFor(fileName)?.status)}`}
                     >
                       {verificationFor(fileName)?.status === "verified"
-                        ? "Verified"
+                        ? "Verified for selected company"
                         : verificationFor(fileName)?.status === "mismatch"
-                        ? "Mismatch"
+                        ? "Mismatch - excluded"
                         : "Needs review"}
                     </span>
                     <button

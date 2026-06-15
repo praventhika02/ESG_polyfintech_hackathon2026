@@ -8,12 +8,15 @@ type EvidenceBrowserProps = {
   events: ExtractedSignal[];
 };
 
-const filters: Array<"All" | EvidenceSourceType> = [
+type EvidenceFilter = "All" | EvidenceSourceType | "High Reliability";
+
+const filters: EvidenceFilter[] = [
   "All",
   "News",
   "Jobs",
   "Patents",
-  "Reports"
+  "Reports",
+  "High Reliability"
 ];
 
 function explanation(event: ExtractedSignal) {
@@ -25,19 +28,25 @@ function explanation(event: ExtractedSignal) {
 }
 
 export function EvidenceBrowser({ events }: EvidenceBrowserProps) {
-  const [filter, setFilter] = useState<"All" | EvidenceSourceType>("All");
+  const [filter, setFilter] = useState<EvidenceFilter>("All");
   const [visibleCount, setVisibleCount] = useState(6);
   const filtered = useMemo(
-    () =>
-      filter === "All"
-        ? events
-        : events.filter((event) => event.sourceType === filter),
+    () => {
+      if (filter === "All") return events;
+      if (filter === "High Reliability") {
+        return events.filter((event) => event.sourceReliability === "High");
+      }
+      return events.filter((event) => event.sourceType === filter);
+    },
     [events, filter]
   );
   const visible = filtered.slice(0, visibleCount);
 
-  function countFor(sourceType: "All" | EvidenceSourceType) {
+  function countFor(sourceType: EvidenceFilter) {
     if (sourceType === "All") return events.length;
+    if (sourceType === "High Reliability") {
+      return events.filter((event) => event.sourceReliability === "High").length;
+    }
     return events.filter((event) => event.sourceType === sourceType).length;
   }
 

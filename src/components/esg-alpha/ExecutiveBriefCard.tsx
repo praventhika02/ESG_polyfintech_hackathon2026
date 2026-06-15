@@ -18,33 +18,34 @@ function decisionLabel(classification: string) {
 function headline(result: EsgScanResult) {
   const gap = result.recognitionGap ?? 0;
 
-  if (gap >= 30) {
-    return `${result.companyName} shows transformation ahead of recognition, creating a possible alpha window.`;
+  if (gap > 20) {
+    return "Transformation is ahead of market recognition.";
   }
-  if (gap >= 15) {
-    return `${result.companyName} shows a positive recognition gap, but confirmation still matters.`;
+  if (gap >= 0) {
+    return "Transformation is developing, but the gap is still narrow.";
   }
-  if (gap < 0) {
-    return `${result.companyName} shows recognition ahead of transformation, limiting early-alpha potential.`;
-  }
-  return `${result.companyName} shows a balanced ESG signal with limited timing gap.`;
+  return "Recognition is running ahead of transformation.";
 }
 
 function bullets(result: EsgScanResult) {
-  const recognition = result.recognitionScore ?? 0;
   const gap = result.recognitionGap ?? 0;
   const reports = result.verifiedReportsFound ?? result.reportSignalsFound ?? 0;
+  const highReliability = result.evidenceTimeline.filter(
+    (item) => item.sourceReliability === "High"
+  ).length;
 
   return [
-    result.transformationStrength > recognition
-      ? "Transformation evidence is stronger than current recognition."
-      : "Transformation evidence does not exceed current recognition.",
-    gap > 0
-      ? `Recognition gap remains positive at +${gap}, creating timing value.`
-      : `Recognition gap is ${gap}, reducing hidden-upside potential.`,
-    reports > 0
-      ? "Verified disclosure support improves confidence."
-      : "Next trigger: verified disclosure or stronger high-reliability news."
+    gap > 20
+      ? "Market timing: the scan found timing value before recognition fully catches up."
+      : gap >= 0
+      ? "Market timing: the signal is improving, but the recognition gap is still modest."
+      : "Market timing: public visibility is moving faster than fresh transformation evidence.",
+    reports > 0 || highReliability > 0
+      ? "Evidence quality: verified disclosure or high-reliability sources support the readout."
+      : "Evidence quality: confidence is limited without verified disclosure support.",
+    gap > 20
+      ? "Next trigger: watch for analyst coverage or ESG rankings that could close the gap."
+      : "Next trigger: look for verified reports or high-reliability operational ESG news."
   ];
 }
 
@@ -58,6 +59,7 @@ function trigger(result: EsgScanResult) {
 
 export function ExecutiveBriefCard({ result }: ExecutiveBriefCardProps) {
   const summary = [
+    `${result.companyName}:`,
     headline(result),
     ...bullets(result),
     trigger(result)

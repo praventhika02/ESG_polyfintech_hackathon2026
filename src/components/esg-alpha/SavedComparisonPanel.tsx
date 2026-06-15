@@ -59,20 +59,20 @@ export function SavedComparisonPanel() {
           <BarChart3 className="h-5 w-5" />
         </span>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-900/60">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mint">
             Saved Comparison
           </p>
-          <h2 className="mt-1 text-xl font-semibold text-[#17211e]">
+          <h2 className="mt-1 text-xl font-semibold text-foreground">
             Compare locally saved ESG Alpha Gap analyses.
           </h2>
-          <p className="mt-2 text-sm leading-6 text-[#596662]">
+          <p className="mt-2 text-sm leading-6 text-muted">
             Scan companies, save the results, then compare 2 to 4 saved analyses.
           </p>
         </div>
       </div>
 
       {savedAnalyses.length < 2 ? (
-        <div className="rounded-xl border border-white/65 bg-white/48 p-5 text-sm font-medium text-[#596662]">
+        <div className="rounded-xl border border-white/10 bg-white/[0.045] p-5 text-sm font-medium text-muted">
           Save at least two scans to compare ESG Alpha Gap results.
         </div>
       ) : (
@@ -88,19 +88,19 @@ export function SavedComparisonPanel() {
                   onClick={() => toggleSaved(saved.id)}
                   className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition ${
                     selected
-                      ? "border-emerald-400 bg-emerald-50 text-[#143b34]"
-                      : "border-white/65 bg-white/48 text-[#42534d] hover:bg-white/70"
+                      ? "border-mint/40 bg-mint/15 text-mint"
+                      : "border-white/10 bg-white/[0.045] text-muted hover:bg-white/[0.075]"
                   }`}
                 >
                   <span>
                     <span className="block text-sm font-semibold">
                       {saved.result.companyName}
                     </span>
-                    <span className="block text-xs text-[#65726e]">
+                    <span className="block text-xs text-muted">
                       {decisionLabel(saved.result.classification)}
                     </span>
                   </span>
-                  {selected ? <Check className="h-4 w-4 text-emerald-700" /> : null}
+                  {selected ? <Check className="h-4 w-4 text-mint" /> : null}
                 </button>
               );
             })}
@@ -108,9 +108,9 @@ export function SavedComparisonPanel() {
 
           {selectedResults.length >= 2 ? (
             <div className="mt-5 grid gap-5">
-              <div className="overflow-x-auto rounded-xl border border-white/65 bg-white/48">
+              <div className="overflow-x-auto rounded-xl border border-white/10 bg-white/[0.045]">
                 <table className="w-full min-w-[820px] text-left text-sm">
-                  <thead className="border-b border-white/70 text-xs uppercase tracking-[0.12em] text-emerald-900/60">
+                  <thead className="border-b border-white/10 text-xs uppercase tracking-[0.12em] text-muted">
                     <tr>
                       <th className="px-4 py-3">Company</th>
                       <th className="px-4 py-3">Decision</th>
@@ -123,8 +123,8 @@ export function SavedComparisonPanel() {
                   </thead>
                   <tbody>
                     {selectedResults.map((result) => (
-                      <tr key={`${result.companyId}-${result.generatedAt}`} className="border-b border-white/50 last:border-0">
-                        <td className="px-4 py-3 font-semibold text-[#17211e]">{result.companyName}</td>
+                      <tr key={`${result.companyId}-${result.generatedAt}`} className="border-b border-white/10 last:border-0">
+                        <td className="px-4 py-3 font-semibold text-foreground">{result.companyName}</td>
                         <td className="px-4 py-3">{decisionLabel(result.classification)}</td>
                         <td className="px-4 py-3">{result.transformationStrength}</td>
                         <td className="px-4 py-3">{result.recognitionScore ?? 0}</td>
@@ -142,7 +142,7 @@ export function SavedComparisonPanel() {
               />
             </div>
           ) : (
-            <p className="mt-4 rounded-xl border border-white/65 bg-white/48 p-4 text-sm font-medium text-[#596662]">
+            <p className="mt-4 rounded-xl border border-white/10 bg-white/[0.045] p-4 text-sm font-medium text-muted">
               Select at least two saved analyses to compare.
             </p>
           )}
