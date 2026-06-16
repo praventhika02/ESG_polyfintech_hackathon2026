@@ -62,6 +62,7 @@ function investorDecision(classification: EsgScanResult["classification"]) {
   if (classification === "Early Alpha Opportunity") return "Act Early";
   if (classification === "Emerging ESG Improver") return "Monitor Closely";
   if (classification === "Already Recognised") return "Already Priced In";
+  if (classification === "Overrated ESG Story") return "Be Cautious";
   if (classification === "Innovation Watchlist") return "Wait for Confirmation";
   return "Avoid for Now";
 }

@@ -67,6 +67,19 @@ function decisionFor(classification: Classification): Decision {
           "Use as ESG quality exposure, not early-alpha discovery."
         ]
       };
+    case "Overrated ESG Story":
+      return {
+        label: "Be Cautious",
+        tone: "border-amber-300/30 bg-amber-400/12 text-amber-200",
+        icon: AlertTriangle,
+        upgradeTrigger: "Fresh operational ESG evidence lifts transformation above 70 while recognition stops rising.",
+        downgradeTrigger: "Recognition keeps rising while transformation remains below the strong threshold.",
+        nextSteps: [
+          "Do not treat ESG visibility as hidden alpha.",
+          "Validate whether public attention is supported by real operational progress.",
+          "Wait for stronger transformation evidence before entering."
+        ]
+      };
     case "Innovation Watchlist":
       return {
         label: "Wait for Confirmation",
@@ -110,6 +123,9 @@ function verdictWhy(result: EsgScanResult) {
   if (result.classification === "Already Recognised") {
     return `${result.classification}: recognition is ${recognition}/100, so public visibility has narrowed the early-alpha window.`;
   }
+  if (result.classification === "Overrated ESG Story") {
+    return `${result.classification}: recognition is ${recognition}/100 while transformation is ${result.transformationStrength}/100, so visibility is ahead of operational evidence.`;
+  }
   if (result.classification === "Innovation Watchlist") {
     return `${result.classification}: early intelligence layers are active, but live public confirmation is still limited.`;
   }
@@ -127,6 +143,9 @@ function shortStand(result: EsgScanResult) {
   }
   if (result.classification === "Already Recognised") {
     return "Be valuation-aware - public recognition has already caught up.";
+  }
+  if (result.classification === "Overrated ESG Story") {
+    return "Be cautious - recognition is stronger than the transformation signal.";
   }
   if (result.classification === "Innovation Watchlist") {
     return "Wait for confirmation - early intelligence exists, but public evidence is limited.";

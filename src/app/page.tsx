@@ -75,6 +75,9 @@ function investorActionForClassification(classification: string) {
   if (classification === "Emerging ESG Improver") {
     return "ESG transformation evidence is developing across multiple sources. Continue monitoring for stronger recognition lag.";
   }
+  if (classification === "Overrated ESG Story") {
+    return "Public recognition is high while transformation evidence is below the strong threshold. Be cautious and validate whether ESG attention is crowded.";
+  }
   if (classification === "Innovation Watchlist") {
     return "Patent and hiring signals suggest early innovation activity, but live news recognition is limited. Monitor for confirmation.";
   }

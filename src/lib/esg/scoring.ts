@@ -43,6 +43,39 @@ const institutionalKeywords = [
   "business times"
 ];
 
+const transformationActionKeywords = [
+  "opens",
+  "opened",
+  "launch",
+  "launched",
+  "build",
+  "built",
+  "develop",
+  "develops",
+  "developed",
+  "invest",
+  "invests",
+  "investment",
+  "expand",
+  "expands",
+  "expanded",
+  "renewable facility",
+  "renewable project",
+  "solar",
+  "wind",
+  "battery storage",
+  "green hydrogen",
+  "emissions reduction",
+  "decarbonisation",
+  "decarbonization",
+  "energy efficiency",
+  "green building",
+  "sustainable finance",
+  "supply chain traceability",
+  "carbon capture",
+  "transition plan"
+];
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
@@ -63,7 +96,7 @@ function sourceDiversityScore(activeSourceCount: number, mode: "transformation" 
 }
 
 function recognitionLevelFromScore(score: number): MarketRecognition {
-  if (score >= 70) return "High";
+  if (score >= 65) return "High";
   if (score >= 40) return "Medium";
   return "Low";
 }
@@ -79,13 +112,13 @@ function recognitionScoreFromSignals(signals: ExtractedSignal[]) {
   const newsCount = signals.length;
   const uniquePublishers = new Set(signals.map((signal) => signal.source)).size;
   const baseNewsScore =
-    newsCount >= 9 ? 32 : newsCount >= 6 ? 28 : newsCount >= 3 ? 20 : newsCount >= 1 ? 10 : 0;
+    newsCount >= 9 ? 28 : newsCount >= 6 ? 24 : newsCount >= 3 ? 16 : newsCount >= 1 ? 8 : 0;
   const newsVisibilityScore = Math.min(
-    35,
-    baseNewsScore + (uniquePublishers >= 3 ? 3 : 0)
+    30,
+    baseNewsScore + (uniquePublishers >= 3 ? 2 : 0)
   );
   const formalRecognitionScore = Math.min(
-    35,
+    25,
     keywordHitCount(signals, formalRecognitionKeywords) * 8
   );
   const institutionalVisibilityScore = Math.min(
@@ -93,18 +126,20 @@ function recognitionScoreFromSignals(signals: ExtractedSignal[]) {
     keywordHitCount(signals, institutionalKeywords) * 5
   );
   const sourceReliabilityVisibilityScore = Math.min(
-    10,
+    15,
     signals.reduce((total, signal) => {
-      if (signal.sourceReliability === "High") return total + 3;
+      if (signal.sourceReliability === "High") return total + 4;
       if (signal.sourceReliability === "Medium") return total + 2;
       return total + 0.5;
     }, 0)
   );
+  const repeatedCoverageScore = Math.min(10, Math.max(0, newsCount - uniquePublishers) * 2);
   const recognitionScore = clamp(
     newsVisibilityScore +
       formalRecognitionScore +
       institutionalVisibilityScore +
-      sourceReliabilityVisibilityScore,
+      sourceReliabilityVisibilityScore +
+      repeatedCoverageScore,
     0,
     100
   );
@@ -114,20 +149,21 @@ function recognitionScoreFromSignals(signals: ExtractedSignal[]) {
     newsVisibilityScore,
     formalRecognitionScore,
     institutionalVisibilityScore,
-    sourceReliabilityVisibilityScore
+    sourceReliabilityVisibilityScore,
+    repeatedCoverageScore
   };
 }
 
 function gapInterpretation(gap: number) {
-  if (gap >= 30) {
+  if (gap >= 25) {
     return "Strong hidden opportunity: transformation signals are meaningfully ahead of market recognition.";
   }
 
-  if (gap >= 15) {
+  if (gap >= 10) {
     return "Developing opportunity: recognition is catching up, but a timing gap remains.";
   }
 
-  if (gap >= 0) {
+  if (gap >= -10) {
     return "Fairly recognised: transformation and market recognition appear broadly balanced.";
   }
 
@@ -146,19 +182,21 @@ function alphaWindowFromGap({
   marketRecognition: MarketRecognition;
 }) {
   let months =
-    classification === "Already Recognised"
+    classification === "Already Recognised" || classification === "Overrated ESG Story"
       ? 2
-      : recognitionGap >= 30
+      : recognitionGap >= 25
         ? 10
-        : recognitionGap >= 15
+        : recognitionGap >= 10
           ? 6
-          : recognitionGap >= 0
+          : recognitionGap >= -10
             ? 4
             : 2;
 
   if (confidence < 60) months = Math.min(months, 4);
   if (marketRecognition === "High") months = Math.min(months, 4);
-  if (classification === "Already Recognised") months = Math.min(months, 3);
+  if (classification === "Already Recognised" || classification === "Overrated ESG Story") {
+    months = Math.min(months, 3);
+  }
   if (classification === "Evidence Watchlist") months = Math.min(months, 3);
 
   return months;
@@ -169,43 +207,34 @@ function classify({
   confidence,
   recognitionScore,
   recognitionGap,
-  marketRecognition,
-  newsCount,
-  patentSignalCount,
-  jobSignalCount
+  marketRecognition
 }: {
   transformationStrength: number;
   confidence: number;
   recognitionScore: number;
   recognitionGap: number;
   marketRecognition: MarketRecognition;
-  newsCount: number;
-  patentSignalCount: number;
-  jobSignalCount: number;
 }): Classification {
-  if (recognitionScore >= 75 && recognitionGap <= 15) {
-    return "Already Recognised";
-  }
-
   if (
-    transformationStrength >= 78 &&
-    confidence >= 72 &&
-    recognitionGap >= 30 &&
+    transformationStrength >= 70 &&
+    recognitionScore < 65 &&
+    recognitionGap >= 25 &&
+    confidence >= 70 &&
     marketRecognition !== "High"
   ) {
     return "Early Alpha Opportunity";
   }
 
-  if (transformationStrength >= 65 && confidence >= 60 && recognitionGap >= 15) {
+  if (transformationStrength >= 70 && recognitionScore >= 65) {
+    return "Already Recognised";
+  }
+
+  if (transformationStrength >= 55 && recognitionScore < 65 && confidence >= 60) {
     return "Emerging ESG Improver";
   }
 
-  if (
-    newsCount <= 2 &&
-    (patentSignalCount >= 2 || jobSignalCount >= 2) &&
-    confidence >= 50
-  ) {
-    return "Innovation Watchlist";
+  if (transformationStrength < 70 && recognitionScore >= 65) {
+    return "Overrated ESG Story";
   }
 
   return "Evidence Watchlist";
@@ -219,6 +248,8 @@ function investorActionFor(classification: Classification) {
       return "ESG transformation evidence is developing across multiple sources. Continue monitoring for stronger recognition lag.";
     case "Already Recognised":
       return "ESG activity is strong, but public recognition has already caught up, reducing the early-alpha window.";
+    case "Overrated ESG Story":
+      return "Public recognition is high while transformation evidence is not strong enough. Treat as crowded ESG attention and be cautious.";
     case "Innovation Watchlist":
       return "Patent and hiring signals suggest early innovation activity, but public evidence is not yet strong enough.";
     case "Evidence Watchlist":
@@ -304,10 +335,14 @@ function scoreModel({
 }): EsgScanResult {
   const newsCount = signals.length;
   const positiveSignals = signals.filter((signal) => signal.signalScore > 5);
+  const actionSignals = positiveSignals.filter((signal) => {
+    const text = `${signal.title} ${signal.summary}`.toLowerCase();
+    return transformationActionKeywords.some((keyword) => text.includes(keyword));
+  });
   const negativeSignals = signals.filter((signal) => signal.impact === "Negative");
   const averagePositiveSignalScore =
-    positiveSignals.length > 0
-      ? positiveSignals.reduce((total, signal) => total + signal.signalScore, 0) / positiveSignals.length
+    actionSignals.length > 0
+      ? actionSignals.reduce((total, signal) => total + signal.signalScore, 0) / actionSignals.length
       : 0;
   const activeSourceCount = [
     newsCount > 0,
@@ -318,22 +353,24 @@ function scoreModel({
 
   const newsScore = clamp(
     Math.round(
-      positiveSignals.length * 3.5 +
+      actionSignals.length * 4 +
         averagePositiveSignalScore * 0.4 -
         negativeSignals.length * 4
     ),
     0,
-    40
+    35
   );
-  const patentScore = pointsFromCount(patentSignalCount, 3, 6, 10);
-  const hiringScore = pointsFromCount(jobSignalCount, 3, 6, 10);
+  const patentScore = pointsFromCount(patentSignalCount, 5, 10, 15);
+  const hiringScore = pointsFromCount(jobSignalCount, 5, 10, 15);
   const reportScore =
-    reportThemeCount >= 6 ? 15 : reportThemeCount >= 3 ? 10 : reportThemeCount >= 1 ? 5 : 0;
+    reportThemeCount >= 6 ? 20 : reportThemeCount >= 3 ? 14 : reportThemeCount >= 1 ? 8 : 0;
   const diversityBonus = sourceDiversityScore(activeSourceCount, "transformation");
+  const weakEvidencePenalty =
+    newsCount > 0 && actionSignals.length === 0 && verifiedReportCount === 0 ? 10 : 0;
   const transformationStrength = clamp(
-    newsScore + patentScore + hiringScore + reportScore + diversityBonus,
+    newsScore + patentScore + hiringScore + reportScore + diversityBonus - weakEvidencePenalty,
     0,
-    95
+    100
   );
   const recognition = recognitionScoreFromSignals(signals);
   const recognitionScore = recognition.recognitionScore;
@@ -369,10 +406,7 @@ function scoreModel({
     confidence,
     recognitionScore,
     recognitionGap,
-    marketRecognition,
-    newsCount,
-    patentSignalCount,
-    jobSignalCount
+    marketRecognition
   });
   const alphaWindow = alphaWindowFromGap({
     recognitionGap,
@@ -389,6 +423,7 @@ function scoreModel({
       hiringScore,
       reportScore,
       diversityBonus,
+      weakEvidencePenalty,
       explanation: "Measures ESG change signals from news, patent intelligence, hiring intelligence, and verified uploaded reports."
     },
     confidence: {
@@ -409,6 +444,7 @@ function scoreModel({
       formalRecognitionScore: recognition.formalRecognitionScore,
       institutionalVisibilityScore: recognition.institutionalVisibilityScore,
       sourceReliabilityVisibilityScore: recognition.sourceReliabilityVisibilityScore,
+      repeatedCoverageScore: recognition.repeatedCoverageScore,
       explanation: "Measures how much the market has already noticed the ESG story through news visibility, formal recognition signals, institutional attention, and source reliability."
     },
     recognitionGap: {

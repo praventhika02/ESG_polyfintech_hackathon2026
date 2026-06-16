@@ -4,6 +4,7 @@ export type Classification =
   | "Early Alpha Opportunity"
   | "Emerging ESG Improver"
   | "Already Recognised"
+  | "Overrated ESG Story"
   | "Watchlist"
   | "Innovation Watchlist"
   | "Evidence Watchlist";
@@ -80,6 +81,7 @@ export type ScoreBreakdown = {
     hiringScore: number;
     reportScore: number;
     diversityBonus: number;
+    weakEvidencePenalty: number;
     explanation: string;
   };
   confidence: {
@@ -100,6 +102,7 @@ export type ScoreBreakdown = {
     formalRecognitionScore: number;
     institutionalVisibilityScore: number;
     sourceReliabilityVisibilityScore: number;
+    repeatedCoverageScore: number;
     explanation: string;
   };
   recognitionGap: {

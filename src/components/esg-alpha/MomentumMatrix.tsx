@@ -17,6 +17,7 @@ type SavedAnalysis = {
 type MomentumQuadrant =
   | "Hidden Winners"
   | "Future Leaders"
+  | "Emerging Improvers"
   | "Overrated Leaders"
   | "Value Traps";
 
@@ -36,8 +37,9 @@ type MatrixPoint = {
 };
 
 const savedAnalysisKey = "esg-alpha-gap-saved-analyses";
-const recognitionThreshold = 50;
-const transformationThreshold = 50;
+const recognitionThreshold = 65;
+const highTransformationThreshold = 70;
+const emergingTransformationThreshold = 55;
 
 const svgW = 1000;
 const svgH = 650;
@@ -45,10 +47,11 @@ const plotX = 110;
 const plotY = 70;
 const plotW = 760;
 const plotH = 460;
-const topZoneH = plotH * 0.5;
-const bottomZoneH = plotH * 0.5;
-const thresholdX = plotX + plotW * 0.5;
-const thresholdY = plotY + topZoneH;
+const recognitionLineX = plotX + (recognitionThreshold / 100) * plotW;
+const highTransformationY =
+  plotY + ((100 - highTransformationThreshold) / 100) * plotH;
+const emergingTransformationY =
+  plotY + ((100 - emergingTransformationThreshold) / 100) * plotH;
 
 const pointColors = ["#F5FFF9", "#B8C7FF", "#D8B4FE", "#CBD5E1", "#FBCFE8"];
 const pointOffsets = [
@@ -73,6 +76,11 @@ const quadrantCopy: Record<
       "Transformation and recognition are both high. This suggests ESG quality, but less hidden upside.",
     implication: "Quality ESG leader"
   },
+  "Emerging Improvers": {
+    meaning:
+      "Transformation is building, while recognition is not yet high. This is a monitor-closely zone.",
+    implication: "Monitor closely"
+  },
   "Overrated Leaders": {
     meaning:
       "Recognition is high while transformation is comparatively weaker. This may indicate crowded ESG attention.",
@@ -89,13 +97,29 @@ export function getMomentumQuadrant(
   transformationStrength: number,
   recognitionScore: number
 ): MomentumQuadrant {
-  if (transformationStrength >= transformationThreshold && recognitionScore < recognitionThreshold) {
+  if (
+    transformationStrength >= highTransformationThreshold &&
+    recognitionScore < recognitionThreshold
+  ) {
     return "Hidden Winners";
   }
-  if (transformationStrength >= transformationThreshold && recognitionScore >= recognitionThreshold) {
+  if (
+    transformationStrength >= highTransformationThreshold &&
+    recognitionScore >= recognitionThreshold
+  ) {
     return "Future Leaders";
   }
-  if (transformationStrength < transformationThreshold && recognitionScore >= recognitionThreshold) {
+  if (
+    transformationStrength >= emergingTransformationThreshold &&
+    transformationStrength < highTransformationThreshold &&
+    recognitionScore < recognitionThreshold
+  ) {
+    return "Emerging Improvers";
+  }
+  if (
+    transformationStrength < highTransformationThreshold &&
+    recognitionScore >= recognitionThreshold
+  ) {
     return "Overrated Leaders";
   }
   return "Value Traps";
@@ -242,7 +266,7 @@ function resultToPoint(result: EsgScanResult, index: number, isCurrentOnly: bool
   const baseX = plotX + (recognitionScore / 100) * plotW;
   const baseY = plotY + ((100 - transformationStrength) / 100) * plotH;
   const offset = isCurrentOnly ? { x: 0, y: 0 } : pointOffsets[index % pointOffsets.length];
-  const x = clampNumber(baseX + offset.x, plotX + 18, plotX + plotW - 96);
+  const x = clampNumber(baseX + offset.x, plotX + 18, plotX + plotW - 86);
   const y = clampNumber(baseY + offset.y, plotY + 24, plotY + plotH - 24);
   const recognitionGap = result.recognitionGap ?? transformationStrength - recognitionScore;
   const quadrant = getMomentumQuadrant(transformationStrength, recognitionScore);
@@ -266,10 +290,41 @@ function resultToPoint(result: EsgScanResult, index: number, isCurrentOnly: bool
 function QuadrantBackgrounds() {
   return (
     <>
-      <rect x={plotX} y={plotY} width={plotW / 2} height={topZoneH} fill="rgba(0, 229, 168, 0.14)" />
-      <rect x={thresholdX} y={plotY} width={plotW / 2} height={topZoneH} fill="rgba(34, 211, 238, 0.12)" />
-      <rect x={plotX} y={thresholdY} width={plotW / 2} height={bottomZoneH} fill="rgba(251, 113, 133, 0.10)" />
-      <rect x={thresholdX} y={thresholdY} width={plotW / 2} height={bottomZoneH} fill="rgba(246, 200, 95, 0.10)" />
+      <rect
+        x={plotX}
+        y={plotY}
+        width={recognitionLineX - plotX}
+        height={highTransformationY - plotY}
+        fill="rgba(0, 229, 168, 0.14)"
+      />
+      <rect
+        x={recognitionLineX}
+        y={plotY}
+        width={plotX + plotW - recognitionLineX}
+        height={highTransformationY - plotY}
+        fill="rgba(34, 211, 238, 0.12)"
+      />
+      <rect
+        x={plotX}
+        y={highTransformationY}
+        width={recognitionLineX - plotX}
+        height={emergingTransformationY - highTransformationY}
+        fill="rgba(96, 165, 250, 0.11)"
+      />
+      <rect
+        x={plotX}
+        y={emergingTransformationY}
+        width={recognitionLineX - plotX}
+        height={plotY + plotH - emergingTransformationY}
+        fill="rgba(251, 113, 133, 0.10)"
+      />
+      <rect
+        x={recognitionLineX}
+        y={highTransformationY}
+        width={plotX + plotW - recognitionLineX}
+        height={plotY + plotH - highTransformationY}
+        fill="rgba(246, 200, 95, 0.10)"
+      />
       <rect
         x={plotX}
         y={plotY}
@@ -306,19 +361,28 @@ function ThresholdLines() {
   return (
     <>
       <line
-        x1={thresholdX}
+        x1={recognitionLineX}
         y1={plotY}
-        x2={thresholdX}
+        x2={recognitionLineX}
         y2={plotY + plotH}
         stroke="rgba(245,255,249,0.35)"
         strokeWidth="2"
       />
       <line
         x1={plotX}
-        y1={thresholdY}
+        y1={highTransformationY}
         x2={plotX + plotW}
-        y2={thresholdY}
+        y2={highTransformationY}
         stroke="rgba(245,255,249,0.35)"
+        strokeWidth="2"
+      />
+      <line
+        x1={plotX}
+        y1={emergingTransformationY}
+        x2={recognitionLineX}
+        y2={emergingTransformationY}
+        stroke="rgba(96,165,250,0.30)"
+        strokeDasharray="8 8"
         strokeWidth="2"
       />
     </>
@@ -363,9 +427,15 @@ function QuadrantLabels() {
   return (
     <>
       <QuadrantBadge x={plotX + 90} y={plotY + 45} label="Hidden Winners" tone="mint" />
-      <QuadrantBadge x={plotX + plotW - 160} y={plotY + 45} label="Future Leaders" tone="cyan" />
+      <QuadrantBadge x={plotX + plotW - 155} y={plotY + 45} label="Future Leaders" tone="cyan" />
+      <QuadrantBadge
+        x={plotX + 122}
+        y={highTransformationY + 48}
+        label="Emerging Improvers"
+        tone="blue"
+      />
       <QuadrantBadge x={plotX + 90} y={plotY + plotH - 40} label="Value Traps" tone="rose" />
-      <QuadrantBadge x={plotX + plotW - 190} y={plotY + plotH - 40} label="Overrated Leaders" tone="gold" />
+      <QuadrantBadge x={plotX + plotW - 180} y={plotY + plotH - 40} label="Overrated Leaders" tone="gold" />
     </>
   );
 }
@@ -379,11 +449,12 @@ function QuadrantBadge({
   x: number;
   y: number;
   label: string;
-  tone: "mint" | "cyan" | "gold" | "rose";
+  tone: "mint" | "cyan" | "gold" | "rose" | "blue";
 }) {
   const colors = {
     mint: ["rgba(0,229,168,0.16)", "rgba(0,229,168,0.35)", "#9FFFE5"],
     cyan: ["rgba(34,211,238,0.15)", "rgba(34,211,238,0.34)", "#A5F3FC"],
+    blue: ["rgba(96,165,250,0.14)", "rgba(96,165,250,0.32)", "#BFDBFE"],
     gold: ["rgba(246,200,95,0.14)", "rgba(246,200,95,0.32)", "#F6C85F"],
     rose: ["rgba(251,113,133,0.13)", "rgba(251,113,133,0.30)", "#FDA4AF"]
   }[tone];
@@ -528,8 +599,11 @@ function MatrixCalculationDetails({ points }: { points: MatrixPoint[] }) {
             transformation plotted higher on the chart.
           </p>
           <p className="mt-3">
-            The matrix midpoint is 50 on each axis. This is a visual split for
-            comparing high versus low scores, not a company-specific rule.
+            High transformation requires {highTransformationThreshold}+.
+            High recognition starts at {recognitionThreshold}+. Scores from{" "}
+            {emergingTransformationThreshold} to{" "}
+            {highTransformationThreshold - 1} are treated as emerging
+            transformation, not leadership.
           </p>
         </div>
 
@@ -547,8 +621,8 @@ function MatrixCalculationDetails({ points }: { points: MatrixPoint[] }) {
               </div>
               <p className="mt-2 text-xs leading-5 text-muted">
                 Transformation {point.transformationStrength}{" "}
-                {point.transformationStrength >= transformationThreshold ? ">=" : "<"}{" "}
-                {transformationThreshold}; Recognition {point.recognitionScore}{" "}
+                {transformationBand(point.transformationStrength)}; Recognition{" "}
+                {point.recognitionScore}{" "}
                 {point.recognitionScore >= recognitionThreshold ? ">=" : "<"}{" "}
                 {recognitionThreshold}. Therefore: {point.quadrant}.
               </p>
@@ -576,8 +650,19 @@ function decisionFromClassification(classification: string) {
   if (classification === "Early Alpha Opportunity") return "Act Early";
   if (classification === "Emerging ESG Improver") return "Monitor Closely";
   if (classification === "Already Recognised") return "Already Priced In";
+  if (classification === "Overrated ESG Story") return "Be Cautious";
   if (classification === "Innovation Watchlist") return "Wait for Confirmation";
   return "Avoid for Now";
+}
+
+function transformationBand(value: number) {
+  if (value >= highTransformationThreshold) {
+    return `>= ${highTransformationThreshold} strong`;
+  }
+  if (value >= emergingTransformationThreshold) {
+    return `${emergingTransformationThreshold}-${highTransformationThreshold - 1} emerging`;
+  }
+  return `< ${emergingTransformationThreshold} weak`;
 }
 
 function formatGap(gap: number) {

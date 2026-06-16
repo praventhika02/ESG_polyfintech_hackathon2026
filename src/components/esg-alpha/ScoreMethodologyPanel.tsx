@@ -59,17 +59,18 @@ export function ScoreMethodologyPanel({ result }: ScoreMethodologyPanelProps) {
   if (!breakdown) return null;
 
   const transformationFactors = [
-    { label: "News transformation", value: breakdown.transformation.newsScore, max: 40, capReason: "Capped at 40 so public news cannot dominate transformation strength." },
-    { label: "Patents", value: breakdown.transformation.patentScore, max: 10, capReason: "Capped at 10 because patent links are intelligence queries, not confirmed filings." },
-    { label: "Hiring", value: breakdown.transformation.hiringScore, max: 10, capReason: "Capped at 10 because hiring links indicate intent, not confirmed headcount." },
-    { label: "Verified reports", value: breakdown.transformation.reportScore, max: 15, capReason: "Capped at 15 because verified disclosure supports but does not decide the verdict alone." },
+    { label: "News transformation", value: breakdown.transformation.newsScore, max: 35, capReason: "Capped at 35 because only operational ESG action news counts as transformation." },
+    { label: "Patents", value: breakdown.transformation.patentScore, max: 15, capReason: "Capped at 15 because patent links are intelligence queries, not confirmed filings." },
+    { label: "Hiring", value: breakdown.transformation.hiringScore, max: 15, capReason: "Capped at 15 because hiring links indicate intent, not confirmed headcount." },
+    { label: "Verified reports", value: breakdown.transformation.reportScore, max: 20, capReason: "Capped at 20 because verified disclosure supports but does not decide the verdict alone." },
     { label: "Source diversity", value: breakdown.transformation.diversityBonus, max: 10, capReason: "Capped at 10 because all active evidence layers were represented." }
   ];
   const recognitionFactors = [
-    { label: "News visibility", value: breakdown.marketRecognition.newsVisibilityScore, max: 35, capReason: "Capped at 35 because article volume reached the maximum visibility threshold." },
-    { label: "Formal recognition", value: breakdown.marketRecognition.formalRecognitionScore, max: 35, capReason: "Capped at 35 because formal ESG recognition signals were already saturated." },
+    { label: "News visibility", value: breakdown.marketRecognition.newsVisibilityScore, max: 30, capReason: "Capped at 30 because public ESG visibility reached the model threshold." },
+    { label: "Formal recognition", value: breakdown.marketRecognition.formalRecognitionScore, max: 25, capReason: "Capped at 25 because formal ESG recognition signals were already saturated." },
     { label: "Institutional attention", value: breakdown.marketRecognition.institutionalVisibilityScore, max: 20, capReason: "Capped at 20 because market attention signals reached the model limit." },
-    { label: "Source reliability", value: breakdown.marketRecognition.sourceReliabilityVisibilityScore, max: 10, capReason: "Capped at 10 because reliability visibility reached the maximum threshold." }
+    { label: "Source prominence", value: breakdown.marketRecognition.sourceReliabilityVisibilityScore, max: 15, capReason: "Capped at 15 because prominent source visibility reached the maximum threshold." },
+    { label: "Repeated coverage", value: breakdown.marketRecognition.repeatedCoverageScore, max: 10, capReason: "Capped at 10 because repeated coverage is limited to prevent media volume dominating." }
   ];
   const confidenceFactors = [
     { label: "Evidence volume", value: breakdown.confidence.volumeScore, max: 25, capReason: "Capped at 25 to avoid overweighting raw evidence count." },
@@ -192,7 +193,9 @@ export function ScoreMethodologyPanel({ result }: ScoreMethodologyPanelProps) {
           <ChevronDown className="h-4 w-4" />
         </summary>
         <p className="mt-3 rounded-xl border border-gold/20 bg-gold/10 px-3 py-2 text-sm leading-6 text-gold">
-          Scores use caps to prevent any single evidence type from dominating the verdict.
+          Scores use stricter thresholds: high transformation starts at 70,
+          high recognition starts at 65, and weak publicity-only evidence is
+          penalised rather than treated as transformation.
         </p>
         <div className="mt-4 grid gap-5 lg:grid-cols-3">
           <div className="space-y-3">
@@ -200,6 +203,18 @@ export function ScoreMethodologyPanel({ result }: ScoreMethodologyPanelProps) {
             {transformationFactors.map((factor) => (
               <BreakdownRow key={factor.label} {...factor} />
             ))}
+            <div className="rounded-xl border border-rose-300/20 bg-rose-400/10 p-3">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-medium text-foreground">Weak evidence penalty</span>
+                <span className="font-semibold text-rose-200">
+                  -{breakdown.transformation.weakEvidencePenalty}
+                </span>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-muted">
+                Applied when public ESG mentions do not show operational
+                transformation and no verified report supports the signal.
+              </p>
+            </div>
           </div>
           <div className="space-y-3">
             <p className="font-semibold text-foreground">Recognition</p>

@@ -38,6 +38,10 @@ function investorActionForClassification(classification: string) {
     return "Patent and hiring signals suggest early innovation activity, but live news recognition is limited. Monitor for confirmation.";
   }
 
+  if (classification === "Overrated ESG Story") {
+    return "Public recognition is high while transformation evidence is below the strong threshold. Be cautious and validate whether ESG attention is already crowded.";
+  }
+
   if (classification === "Evidence Watchlist" || classification === "Watchlist") {
     return "Current evidence is not strong enough for an investor action signal. More signals are needed.";
   }
@@ -104,6 +108,7 @@ function fallbackScoreBreakdown(fallback: (typeof mockResults)[keyof typeof mock
       hiringScore: 0,
       reportScore: 0,
       diversityBonus: 0,
+      weakEvidencePenalty: 0,
       explanation:
         "Fallback scores use a demo scenario because live evidence sources were unavailable."
     },
@@ -127,6 +132,7 @@ function fallbackScoreBreakdown(fallback: (typeof mockResults)[keyof typeof mock
       formalRecognitionScore: 0,
       institutionalVisibilityScore: 0,
       sourceReliabilityVisibilityScore: 0,
+      repeatedCoverageScore: 0,
       explanation:
         "No live ESG news articles were available, so market recognition is inferred from the demo fallback scenario."
     },
