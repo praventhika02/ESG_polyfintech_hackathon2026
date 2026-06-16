@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Check } from "lucide-react";
+import { BarChart3, Check, Trash2 } from "lucide-react";
 import { MomentumMatrix } from "@/components/esg-alpha/MomentumMatrix";
 import type { EsgScanResult } from "@/types/esg";
 
@@ -52,6 +52,22 @@ export function SavedComparisonPanel() {
     });
   }
 
+  function deleteSaved(id: string) {
+    const target = savedAnalyses.find((saved) => saved.id === id);
+    if (!target) return;
+
+    const shouldDelete = window.confirm(
+      `Delete the saved analysis for ${target.result.companyName}?`
+    );
+
+    if (!shouldDelete) return;
+
+    const nextSaved = savedAnalyses.filter((saved) => saved.id !== id);
+    setSavedAnalyses(nextSaved);
+    setSelectedIds((current) => current.filter((selectedId) => selectedId !== id));
+    window.localStorage.setItem(savedAnalysisKey, JSON.stringify(nextSaved));
+  }
+
   return (
     <section className="glass-panel rounded-2xl p-5 sm:p-6">
       <div className="mb-5 flex gap-3">
@@ -71,9 +87,9 @@ export function SavedComparisonPanel() {
         </div>
       </div>
 
-      {savedAnalyses.length < 2 ? (
+      {savedAnalyses.length === 0 ? (
         <div className="rounded-xl border border-white/10 bg-white/[0.045] p-5 text-sm font-medium text-muted">
-          Save at least two scans to compare ESG Alpha Gap results.
+          No saved analyses yet. Save a scan from the Decision view to build a comparison set.
         </div>
       ) : (
         <>
@@ -82,31 +98,50 @@ export function SavedComparisonPanel() {
               const selected = selectedIds.includes(saved.id);
 
               return (
-                <button
+                <div
                   key={saved.id}
-                  type="button"
-                  onClick={() => toggleSaved(saved.id)}
                   className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition ${
                     selected
                       ? "border-mint/40 bg-mint/15 text-mint"
                       : "border-white/10 bg-white/[0.045] text-muted hover:bg-white/[0.075]"
                   }`}
                 >
-                  <span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSaved(saved.id)}
+                    className="min-w-0 flex-1 text-left"
+                  >
                     <span className="block text-sm font-semibold">
                       {saved.result.companyName}
                     </span>
                     <span className="block text-xs text-muted">
                       {decisionLabel(saved.result.classification)}
                     </span>
-                  </span>
-                  {selected ? <Check className="h-4 w-4 text-mint" /> : null}
-                </button>
+                    <span className="mt-2 block text-[11px] font-semibold text-mint">
+                      Saved {new Date(saved.savedAt).toLocaleDateString()}
+                    </span>
+                  </button>
+                  <div className="flex items-center gap-2">
+                    {selected ? <Check className="h-4 w-4 text-mint" /> : null}
+                    <button
+                      type="button"
+                      onClick={() => deleteSaved(saved.id)}
+                      className="rounded-lg border border-rose-300/20 bg-rose-400/10 p-2 text-rose-200 transition hover:bg-rose-400/15"
+                      aria-label={`Delete saved analysis for ${saved.result.companyName}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
               );
             })}
           </div>
 
-          {selectedResults.length >= 2 ? (
+          {savedAnalyses.length < 2 ? (
+            <p className="mt-4 rounded-xl border border-white/10 bg-white/[0.045] p-4 text-sm font-medium text-muted">
+              Save at least two analyses to compare.
+            </p>
+          ) : selectedResults.length >= 2 ? (
             <div className="mt-5 grid gap-5">
               <div className="overflow-x-auto rounded-xl border border-white/10 bg-white/[0.045]">
                 <table className="w-full min-w-[820px] text-left text-sm">

@@ -231,18 +231,34 @@ export default function Home() {
 
   function handleSaveAnalysis() {
     if (!scanResult) return;
+    const existing = savedAnalyses.find(
+      (saved) => saved.result.companyId === scanResult.companyId
+    );
+
+    if (existing) {
+      const shouldUpdate = window.confirm(
+        `${scanResult.companyName} is already saved. Do you want to update the saved analysis with this latest scan?`
+      );
+
+      if (!shouldUpdate) {
+        setSaveMessage("Save cancelled. Existing analysis was kept.");
+        return;
+      }
+    }
+
+    const savedItem: SavedAnalysis = {
+      id: existing?.id ?? `${scanResult.companyId}-${Date.now()}`,
+      savedAt: new Date().toISOString(),
+      result: scanResult
+    };
     const nextSaved: SavedAnalysis[] = [
-      {
-        id: `${scanResult.companyId}-${Date.now()}`,
-        savedAt: new Date().toISOString(),
-        result: scanResult
-      },
-      ...savedAnalyses
+      savedItem,
+      ...savedAnalyses.filter((saved) => saved.result.companyId !== scanResult.companyId)
     ].slice(0, 8);
 
     setSavedAnalyses(nextSaved);
     window.localStorage.setItem(savedAnalysisKey, JSON.stringify(nextSaved));
-    setSaveMessage("Saved locally.");
+    setSaveMessage(existing ? "Saved analysis updated." : "Analysis saved locally.");
   }
 
   function loadSaved(saved: SavedAnalysis) {
