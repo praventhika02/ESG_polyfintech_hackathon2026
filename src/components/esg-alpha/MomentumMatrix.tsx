@@ -1,9 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { EsgScanResult } from "@/types/esg";
 
-type Quadrant =
+type MomentumMatrixProps = {
+  result: EsgScanResult;
+  comparisonResults?: EsgScanResult[];
+};
+
+type SavedAnalysis = {
+  id: string;
+  savedAt: string;
+  result: EsgScanResult;
+};
+
+type MomentumQuadrant =
   | "Hidden Winners"
   | "Future Leaders"
   | "Overrated Leaders"
@@ -15,159 +26,176 @@ type MatrixPoint = {
   transformationStrength: number;
   recognitionScore: number;
   recognitionGap: number;
-  confidence: number;
   investorDecision: string;
-};
-
-type SavedAnalysis = {
-  id: string;
-  savedAt: string;
-  result: EsgScanResult;
-};
-
-type MomentumMatrixProps = {
-  result: EsgScanResult;
+  quadrant: MomentumQuadrant;
+  x: number;
+  y: number;
+  label: string;
+  color: string;
+  radius: number;
 };
 
 const savedAnalysisKey = "esg-alpha-gap-saved-analyses";
+const recognitionThreshold = 50;
+const transformationThreshold = 50;
 
-const SVG_W = 1200;
-const SVG_H = 720;
+const svgW = 1000;
+const svgH = 650;
+const plotX = 110;
+const plotY = 70;
+const plotW = 760;
+const plotH = 460;
+const topZoneH = plotH * 0.5;
+const bottomZoneH = plotH * 0.5;
+const thresholdX = plotX + plotW * 0.5;
+const thresholdY = plotY + topZoneH;
 
-const plot = {
-  x: 120,
-  y: 80,
-  w: 900,
-  h: 520,
-};
-
-const axisMid = 50;
-
-const palette = ["#00e5a8", "#22d3ee", "#f6c85f", "#a78bfa", "#fb7185"];
-
-const offsets = [
+const pointColors = ["#F5FFF9", "#B8C7FF", "#D8B4FE", "#CBD5E1", "#FBCFE8"];
+const pointOffsets = [
   { x: 0, y: 0 },
-  { x: 18, y: -18 },
-  { x: -18, y: 18 },
-  { x: 24, y: 16 },
-  { x: -24, y: -16 },
+  { x: 16, y: -14 },
+  { x: -16, y: 14 },
+  { x: 18, y: 14 },
+  { x: -18, y: -14 }
 ];
 
-export function MomentumMatrix({ result }: MomentumMatrixProps) {
+const quadrantCopy: Record<
+  MomentumQuadrant,
+  { meaning: string; implication: string }
+> = {
+  "Hidden Winners": {
+    meaning:
+      "Transformation is strong while recognition is still low. This is the strongest early-alpha zone.",
+    implication: "Act Early candidate"
+  },
+  "Future Leaders": {
+    meaning:
+      "Transformation and recognition are both high. This suggests ESG quality, but less hidden upside.",
+    implication: "Quality ESG leader"
+  },
+  "Overrated Leaders": {
+    meaning:
+      "Recognition is high while transformation is comparatively weaker. This may indicate crowded ESG attention.",
+    implication: "Be cautious"
+  },
+  "Value Traps": {
+    meaning:
+      "Both transformation and recognition are low. Evidence is not strong enough yet.",
+    implication: "Avoid until evidence improves"
+  }
+};
+
+export function getMomentumQuadrant(
+  transformationStrength: number,
+  recognitionScore: number
+): MomentumQuadrant {
+  if (transformationStrength >= transformationThreshold && recognitionScore < recognitionThreshold) {
+    return "Hidden Winners";
+  }
+  if (transformationStrength >= transformationThreshold && recognitionScore >= recognitionThreshold) {
+    return "Future Leaders";
+  }
+  if (transformationStrength < transformationThreshold && recognitionScore >= recognitionThreshold) {
+    return "Overrated Leaders";
+  }
+  return "Value Traps";
+}
+
+export function MomentumMatrix({ result, comparisonResults = [] }: MomentumMatrixProps) {
   const [mode, setMode] = useState<"current" | "saved">("current");
+  const [savedAnalyses, setSavedAnalyses] = useState<SavedAnalysis[]>([]);
+  const [hoveredPointId, setHoveredPointId] = useState<string | null>(null);
+  const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
 
-  const currentPoint = useMemo(() => resultToPoint(result, "current"), [result]);
+  const hasExternalComparison = comparisonResults.length > 0;
 
-  const savedPoints = useMemo(() => {
-    if (typeof window === "undefined") return [];
-
+  useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(savedAnalysisKey);
-      if (!raw) return [];
-
-      const saved = JSON.parse(raw) as SavedAnalysis[];
-
-      return saved
-        .filter((item) => item?.result)
-        .slice(0, 5)
-        .map((item) => resultToPoint(item.result, item.id));
-    } catch {
-      return [];
+      const savedValue = window.localStorage.getItem(savedAnalysisKey);
+      if (savedValue) setSavedAnalyses(JSON.parse(savedValue) as SavedAnalysis[]);
+    } catch (error) {
+      console.error("[UI] Failed to load saved matrix scans", error);
     }
   }, []);
 
-  const points = mode === "saved" ? savedPoints : [currentPoint];
+  const rawResults = useMemo(() => {
+    if (hasExternalComparison) return [result, ...comparisonResults];
+    if (mode === "saved") return savedAnalyses.map((item) => item.result).slice(0, 5);
+    return [result];
+  }, [comparisonResults, hasExternalComparison, mode, result, savedAnalyses]);
 
-  const activePoint =
-    mode === "saved" && points.length > 0
-      ? [...points].sort((a, b) => b.recognitionGap - a.recognitionGap)[0]
-      : currentPoint;
-
-  const activeQuadrant = getMomentumQuadrant(
-    activePoint.transformationStrength,
-    activePoint.recognitionScore
+  const points = useMemo(
+    () =>
+      rawResults.map((scanResult, index) =>
+        resultToPoint(scanResult, index, mode === "current" && !hasExternalComparison)
+      ),
+    [hasExternalComparison, mode, rawResults]
   );
 
-  const activeInfo = getQuadrantInfo(activeQuadrant);
+  const hoveredPoint = points.find((point) => point.id === hoveredPointId);
+  const selectedPoint =
+    points.find((point) => point.id === selectedPointId) ?? points[0] ?? resultToPoint(result, 0, true);
 
-  const comparisonSummary = useMemo(() => {
-    if (points.length < 2) return null;
-
-    return {
-      count: points.length,
-      bestGap: [...points].sort((a, b) => b.recognitionGap - a.recognitionGap)[0],
-      mostRecognised: [...points].sort(
-        (a, b) => b.recognitionScore - a.recognitionScore
-      )[0],
-      strongestTransformation: [...points].sort(
-        (a, b) => b.transformationStrength - a.transformationStrength
-      )[0],
-    };
-  }, [points]);
+  const showSavedEmpty = !hasExternalComparison && mode === "saved" && points.length < 2;
 
   return (
-    <section className="rounded-[30px] border border-white/10 bg-[#061c1a]/95 p-6 shadow-2xl shadow-black/40 backdrop-blur-xl">
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="rounded-2xl border border-white/10 bg-[#061c1a]/92 p-5 shadow-2xl shadow-black/30">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.32em] text-[#00e5a8]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-mint">
             Momentum Matrix
           </p>
-          <h2 className="mt-2 text-3xl font-black text-[#f5fff9]">
+          <h2 className="mt-1 text-2xl font-semibold text-foreground">
             Where does this company sit?
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#a9c8bf]">
-            Live scores place each company by transformation strength and market
-            recognition.
-          </p>
         </div>
 
-        <div className="flex rounded-2xl border border-white/10 bg-white/5 p-1">
-          <button
-            type="button"
-            onClick={() => setMode("current")}
-            className={`rounded-xl px-5 py-2.5 text-sm font-bold transition ${
-              mode === "current"
-                ? "bg-[#00e5a8] text-[#05201c]"
-                : "text-[#a9c8bf] hover:text-white"
-            }`}
-          >
-            Current scan
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("saved")}
-            className={`rounded-xl px-5 py-2.5 text-sm font-bold transition ${
-              mode === "saved"
-                ? "bg-[#00e5a8] text-[#05201c]"
-                : "text-[#a9c8bf] hover:text-white"
-            }`}
-          >
-            Saved comparison
-          </button>
-        </div>
+        {!hasExternalComparison ? (
+          <div className="flex w-fit rounded-xl border border-white/10 bg-white/[0.045] p-1">
+            {[
+              ["current", "Current scan"],
+              ["saved", "Saved comparison"]
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => {
+                  setMode(value as "current" | "saved");
+                  setHoveredPointId(null);
+                  setSelectedPointId(null);
+                }}
+                className={`rounded-lg px-4 py-2 text-xs font-semibold transition ${
+                  mode === value ? "bg-mint text-[#05201c]" : "text-muted hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      {mode === "saved" && points.length < 2 ? (
-        <div className="rounded-3xl border border-dashed border-white/15 bg-white/[0.04] p-10 text-center">
-          <p className="text-lg font-bold text-[#f5fff9]">
+      {showSavedEmpty ? (
+        <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.045] p-8 text-center">
+          <p className="text-base font-semibold text-foreground">
             Save at least two analyses to compare.
           </p>
-          <p className="mt-2 text-sm text-[#a9c8bf]">
-            Scan companies, save results locally, then return here.
+          <p className="mt-2 text-sm text-muted">
+            Saved comparison uses locally saved scan results only.
           </p>
         </div>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]">
-          <div className="rounded-[28px] border border-white/10 bg-[#031416] p-4">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="rounded-2xl border border-white/10 bg-[#071f22] p-2">
             <svg
-              viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-              className="h-[650px] w-full"
+              viewBox={`0 0 ${svgW} ${svgH}`}
+              className="h-[560px] w-full"
               role="img"
-              aria-label="ESG Alpha Gap momentum matrix"
+              aria-label="ESG Alpha Gap momentum matrix scatter plot"
             >
               <defs>
-                <filter id="dotGlow" x="-100%" y="-100%" width="300%" height="300%">
-                  <feGaussianBlur stdDeviation="6" result="blur" />
+                <filter id="matrixDotGlow" x="-80%" y="-80%" width="260%" height="260%">
+                  <feGaussianBlur stdDeviation="5" result="blur" />
                   <feMerge>
                     <feMergeNode in="blur" />
                     <feMergeNode in="SourceGraphic" />
@@ -175,220 +203,373 @@ export function MomentumMatrix({ result }: MomentumMatrixProps) {
                 </filter>
               </defs>
 
-              <rect width={SVG_W} height={SVG_H} rx="28" fill="#031416" />
+              <rect width={svgW} height={svgH} rx="22" fill="#071f22" />
+              <QuadrantBackgrounds />
+              <GridLines />
+              <ThresholdLines />
+              <Axes />
+              <QuadrantLabels />
 
-              <rect
-                x={plot.x}
-                y={plot.y}
-                width={plot.w}
-                height={plot.h}
-                rx="22"
-                fill="#062322"
-                stroke="rgba(245,255,249,0.22)"
-                strokeWidth="2"
-              />
+              {points.map((point) => (
+                <PointMark
+                  key={point.id}
+                  point={point}
+                  isSelected={selectedPoint.id === point.id}
+                  onHover={() => setHoveredPointId(point.id)}
+                  onLeave={() => setHoveredPointId(null)}
+                  onSelect={() => setSelectedPointId(point.id)}
+                />
+              ))}
 
-              <rect x={plot.x} y={plot.y} width={plot.w / 2} height={plot.h / 2} fill="rgba(0,229,168,0.16)" />
-              <rect x={plot.x + plot.w / 2} y={plot.y} width={plot.w / 2} height={plot.h / 2} fill="rgba(34,211,238,0.15)" />
-              <rect x={plot.x} y={plot.y + plot.h / 2} width={plot.w / 2} height={plot.h / 2} fill="rgba(251,113,133,0.12)" />
-              <rect x={plot.x + plot.w / 2} y={plot.y + plot.h / 2} width={plot.w / 2} height={plot.h / 2} fill="rgba(246,200,95,0.12)" />
-
-              {Array.from({ length: 11 }).map((_, index) => {
-                const x = plot.x + (index / 10) * plot.w;
-                return (
-                  <line
-                    key={`x-${index}`}
-                    x1={x}
-                    y1={plot.y}
-                    x2={x}
-                    y2={plot.y + plot.h}
-                    stroke="rgba(255,255,255,0.07)"
-                  />
-                );
-              })}
-
-              {Array.from({ length: 11 }).map((_, index) => {
-                const y = plot.y + (index / 10) * plot.h;
-                return (
-                  <line
-                    key={`y-${index}`}
-                    x1={plot.x}
-                    y1={y}
-                    x2={plot.x + plot.w}
-                    y2={y}
-                    stroke="rgba(255,255,255,0.07)"
-                  />
-                );
-              })}
-
-              <line
-                x1={plot.x + plot.w / 2}
-                y1={plot.y}
-                x2={plot.x + plot.w / 2}
-                y2={plot.y + plot.h}
-                stroke="rgba(245,255,249,0.42)"
-                strokeWidth="2"
-                strokeDasharray="6 6"
-              />
-              <line
-                x1={plot.x}
-                y1={plot.y + plot.h / 2}
-                x2={plot.x + plot.w}
-                y2={plot.y + plot.h / 2}
-                stroke="rgba(245,255,249,0.42)"
-                strokeWidth="2"
-                strokeDasharray="6 6"
-              />
-
-              <QuadrantBadge x={plot.x + 34} y={plot.y + 38} label="Hidden Winners" />
-              <QuadrantBadge x={plot.x + plot.w - 188} y={plot.y + 38} label="Future Leaders" tone="cyan" />
-              <QuadrantBadge x={plot.x + 34} y={plot.y + plot.h - 28} label="Value Traps" tone="rose" />
-              <QuadrantBadge x={plot.x + plot.w - 220} y={plot.y + plot.h - 28} label="Overrated Leaders" tone="gold" />
-
-              <text x={plot.x + plot.w / 2} y={plot.y + plot.h + 58} textAnchor="middle" fill="#d8fff2" fontSize="20" fontWeight="900">
-                Recognition Score →
-              </text>
-              <text x={plot.x} y={plot.y + plot.h + 88} textAnchor="start" fill="#a9c8bf" fontSize="16" fontWeight="800">
-                Low Recognition
-              </text>
-              <text x={plot.x + plot.w} y={plot.y + plot.h + 88} textAnchor="end" fill="#a9c8bf" fontSize="16" fontWeight="800">
-                High Recognition
-              </text>
-
-              <text
-                x={48}
-                y={plot.y + plot.h / 2}
-                transform={`rotate(-90 48 ${plot.y + plot.h / 2})`}
-                textAnchor="middle"
-                fill="#d8fff2"
-                fontSize="20"
-                fontWeight="900"
-              >
-                Transformation Strength ↑
-              </text>
-              <text x={72} y={plot.y + 10} fill="#a9c8bf" fontSize="16" fontWeight="800" textAnchor="middle">
-                High
-              </text>
-              <text x={72} y={plot.y + plot.h} fill="#a9c8bf" fontSize="16" fontWeight="800" textAnchor="middle">
-                Low
-              </text>
-
-              {points.map((point, index) => {
-                const { x, y } = getPointPosition(point, index);
-                const color = mode === "current" ? "#00e5a8" : palette[index % palette.length];
-
-                return (
-                  <g key={point.id}>
-                    <circle
-                      cx={x}
-                      cy={y}
-                      r="13"
-                      fill={color}
-                      stroke="#f5fff9"
-                      strokeWidth="3"
-                      filter="url(#dotGlow)"
-                    />
-                    <text
-                      x={x + 20}
-                      y={y + 6}
-                      fill="#f5fff9"
-                      fontSize="16"
-                      fontWeight="900"
-                    >
-                      {shortName(point.companyName)}
-                    </text>
-                  </g>
-                );
-              })}
+              {hoveredPoint ? <PointTooltip point={hoveredPoint} /> : null}
             </svg>
           </div>
 
-          <aside className="rounded-[28px] border border-white/10 bg-white/[0.06] p-6">
-            {mode === "saved" && comparisonSummary ? (
-              <>
-                <p className="text-xs font-black uppercase tracking-[0.32em] text-[#00e5a8]">
-                  Saved comparison
-                </p>
-                <h3 className="mt-4 text-3xl font-black text-[#f5fff9]">
-                  {comparisonSummary.count} analyses plotted
-                </h3>
-
-                <div className="mt-7 grid gap-4">
-                  <SideCard
-                    label="Best gap"
-                    title={comparisonSummary.bestGap.companyName}
-                    detail={`Gap ${formatGap(comparisonSummary.bestGap.recognitionGap)}`}
-                  />
-                  <SideCard
-                    label="Most recognised"
-                    title={comparisonSummary.mostRecognised.companyName}
-                    detail={`Recognition ${comparisonSummary.mostRecognised.recognitionScore}`}
-                  />
-                  <SideCard
-                    label="Highest transformation"
-                    title={comparisonSummary.strongestTransformation.companyName}
-                    detail={`Transformation ${comparisonSummary.strongestTransformation.transformationStrength}`}
-                  />
-                </div>
-              </>
-            ) : (
-              <CurrentPointPanel point={activePoint} />
-            )}
-          </aside>
+          <SidePanel point={selectedPoint} isComparison={mode === "saved" || hasExternalComparison} />
         </div>
       )}
 
-      <details className="mt-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-        <summary className="cursor-pointer text-sm font-bold text-[#00e5a8]">
-          View quadrant rules
-        </summary>
-
-        <div className="mt-4 grid gap-3 text-sm text-[#a9c8bf] md:grid-cols-2">
-          <div className="rounded-xl bg-black/20 p-3">
-            <p className="font-bold text-[#f5fff9]">Top-left: Hidden Winners</p>
-            <p>T ≥ 50 and R &lt; 50</p>
-          </div>
-
-          <div className="rounded-xl bg-black/20 p-3">
-            <p className="font-bold text-[#f5fff9]">Top-right: Future Leaders</p>
-            <p>T ≥ 50 and R ≥ 50</p>
-          </div>
-
-          <div className="rounded-xl bg-black/20 p-3">
-            <p className="font-bold text-[#f5fff9]">
-              Bottom-right: Overrated Leaders
-            </p>
-            <p>T &lt; 50 and R ≥ 50</p>
-          </div>
-
-          <div className="rounded-xl bg-black/20 p-3">
-            <p className="font-bold text-[#f5fff9]">Bottom-left: Value Traps</p>
-            <p>T &lt; 50 and R &lt; 50</p>
-          </div>
-        </div>
-      </details>
+      {!showSavedEmpty ? <MatrixCalculationDetails points={points} /> : null}
     </section>
   );
 }
 
-function resultToPoint(result: EsgScanResult, id: string): MatrixPoint {
-  const recognitionScore =
-    result.recognitionScore ??
-    result.scoreBreakdown?.marketRecognition?.recognitionScore ??
-    0;
-
-  const recognitionGap =
-    result.recognitionGap ?? result.transformationStrength - recognitionScore;
+function resultToPoint(result: EsgScanResult, index: number, isCurrentOnly: boolean): MatrixPoint {
+  const recognitionScore = clamp(
+    result.recognitionScore ?? result.scoreBreakdown?.marketRecognition.recognitionScore ?? 0
+  );
+  const transformationStrength = clamp(result.transformationStrength);
+  const baseX = plotX + (recognitionScore / 100) * plotW;
+  const baseY = plotY + ((100 - transformationStrength) / 100) * plotH;
+  const offset = isCurrentOnly ? { x: 0, y: 0 } : pointOffsets[index % pointOffsets.length];
+  const x = clampNumber(baseX + offset.x, plotX + 18, plotX + plotW - 96);
+  const y = clampNumber(baseY + offset.y, plotY + 24, plotY + plotH - 24);
+  const recognitionGap = result.recognitionGap ?? transformationStrength - recognitionScore;
+  const quadrant = getMomentumQuadrant(transformationStrength, recognitionScore);
 
   return {
-    id,
+    id: `${result.companyId}-${result.generatedAt}-${index}`,
     companyName: result.companyName,
-    transformationStrength: result.transformationStrength,
+    transformationStrength,
     recognitionScore,
     recognitionGap,
-    confidence: result.confidence,
     investorDecision: decisionFromClassification(result.classification),
+    quadrant,
+    x,
+    y,
+    label: shortName(result.companyName),
+    color: isCurrentOnly ? "#F5FFF9" : pointColors[index % pointColors.length],
+    radius: isCurrentOnly ? 9 : 7
   };
+}
+
+function QuadrantBackgrounds() {
+  return (
+    <>
+      <rect x={plotX} y={plotY} width={plotW / 2} height={topZoneH} fill="rgba(0, 229, 168, 0.14)" />
+      <rect x={thresholdX} y={plotY} width={plotW / 2} height={topZoneH} fill="rgba(34, 211, 238, 0.12)" />
+      <rect x={plotX} y={thresholdY} width={plotW / 2} height={bottomZoneH} fill="rgba(251, 113, 133, 0.10)" />
+      <rect x={thresholdX} y={thresholdY} width={plotW / 2} height={bottomZoneH} fill="rgba(246, 200, 95, 0.10)" />
+      <rect
+        x={plotX}
+        y={plotY}
+        width={plotW}
+        height={plotH}
+        rx="14"
+        fill="transparent"
+        stroke="rgba(245,255,249,0.22)"
+        strokeWidth="2"
+      />
+    </>
+  );
+}
+
+function GridLines() {
+  return (
+    <>
+      {Array.from({ length: 11 }).map((_, index) => {
+        const x = plotX + (index / 10) * plotW;
+        const y = plotY + (index / 10) * plotH;
+
+        return (
+          <g key={`grid-${index}`}>
+            <line x1={x} y1={plotY} x2={x} y2={plotY + plotH} stroke="rgba(255,255,255,0.07)" />
+            <line x1={plotX} y1={y} x2={plotX + plotW} y2={y} stroke="rgba(255,255,255,0.07)" />
+          </g>
+        );
+      })}
+    </>
+  );
+}
+
+function ThresholdLines() {
+  return (
+    <>
+      <line
+        x1={thresholdX}
+        y1={plotY}
+        x2={thresholdX}
+        y2={plotY + plotH}
+        stroke="rgba(245,255,249,0.35)"
+        strokeWidth="2"
+      />
+      <line
+        x1={plotX}
+        y1={thresholdY}
+        x2={plotX + plotW}
+        y2={thresholdY}
+        stroke="rgba(245,255,249,0.35)"
+        strokeWidth="2"
+      />
+    </>
+  );
+}
+
+function Axes() {
+  return (
+    <>
+      <text x={plotX + plotW / 2} y={plotY + plotH + 64} textAnchor="middle" fill="#F5FFF9" fontSize="18" fontWeight="800">
+        {"Recognition Score \u2192"}
+      </text>
+      <text x={plotX} y={plotY + plotH + 38} textAnchor="start" fill="#A9C8BF" fontSize="14" fontWeight="700">
+        Low Recognition
+      </text>
+      <text x={plotX + plotW} y={plotY + plotH + 38} textAnchor="end" fill="#A9C8BF" fontSize="14" fontWeight="700">
+        High Recognition
+      </text>
+
+      <text
+        x={58}
+        y={plotY + plotH / 2}
+        transform={`rotate(-90 58 ${plotY + plotH / 2})`}
+        textAnchor="middle"
+        fill="#F5FFF9"
+        fontSize="18"
+        fontWeight="800"
+      >
+        {"Transformation Strength \u2192"}
+      </text>
+      <text x={plotX} y={plotY - 20} textAnchor="start" fill="#A9C8BF" fontSize="13" fontWeight="700">
+        High Transformation
+      </text>
+      <text x={plotX} y={plotY + plotH + 22} textAnchor="start" fill="#A9C8BF" fontSize="13" fontWeight="700">
+        Low Transformation
+      </text>
+    </>
+  );
+}
+
+function QuadrantLabels() {
+  return (
+    <>
+      <QuadrantBadge x={plotX + 90} y={plotY + 45} label="Hidden Winners" tone="mint" />
+      <QuadrantBadge x={plotX + plotW - 160} y={plotY + 45} label="Future Leaders" tone="cyan" />
+      <QuadrantBadge x={plotX + 90} y={plotY + plotH - 40} label="Value Traps" tone="rose" />
+      <QuadrantBadge x={plotX + plotW - 190} y={plotY + plotH - 40} label="Overrated Leaders" tone="gold" />
+    </>
+  );
+}
+
+function QuadrantBadge({
+  x,
+  y,
+  label,
+  tone
+}: {
+  x: number;
+  y: number;
+  label: string;
+  tone: "mint" | "cyan" | "gold" | "rose";
+}) {
+  const colors = {
+    mint: ["rgba(0,229,168,0.16)", "rgba(0,229,168,0.35)", "#9FFFE5"],
+    cyan: ["rgba(34,211,238,0.15)", "rgba(34,211,238,0.34)", "#A5F3FC"],
+    gold: ["rgba(246,200,95,0.14)", "rgba(246,200,95,0.32)", "#F6C85F"],
+    rose: ["rgba(251,113,133,0.13)", "rgba(251,113,133,0.30)", "#FDA4AF"]
+  }[tone];
+  const width = Math.max(132, label.length * 8 + 28);
+
+  return (
+    <g>
+      <rect x={x - width / 2} y={y - 19} width={width} height="34" rx="17" fill={colors[0]} stroke={colors[1]} />
+      <text x={x} y={y + 3} textAnchor="middle" fill={colors[2]} fontSize="13" fontWeight="800">
+        {label}
+      </text>
+    </g>
+  );
+}
+
+function PointMark({
+  point,
+  isSelected,
+  onHover,
+  onLeave,
+  onSelect
+}: {
+  point: MatrixPoint;
+  isSelected: boolean;
+  onHover: () => void;
+  onLeave: () => void;
+  onSelect: () => void;
+}) {
+  return (
+    <g
+      onMouseEnter={onHover}
+      onMouseLeave={onLeave}
+      onClick={onSelect}
+      className="cursor-pointer"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") onSelect();
+      }}
+    >
+      <circle
+        cx={point.x}
+        cy={point.y}
+        r={isSelected ? point.radius + 3 : point.radius}
+        fill={point.color}
+        stroke={isSelected ? "#F5FFF9" : "rgba(245,255,249,0.75)"}
+        strokeWidth={isSelected ? 3 : 2}
+        filter="url(#matrixDotGlow)"
+      />
+      <text x={point.x + 15} y={point.y + 5} fill="#F5FFF9" fontSize="13" fontWeight="800">
+        {point.label}
+      </text>
+    </g>
+  );
+}
+
+function PointTooltip({ point }: { point: MatrixPoint }) {
+  const width = 230;
+  const height = 92;
+  const x = clampNumber(point.x - width / 2, plotX + 8, plotX + plotW - width - 8);
+  const y = point.y - height - 18 < plotY ? point.y + 20 : point.y - height - 18;
+
+  return (
+    <g pointerEvents="none">
+      <rect x={x} y={y} width={width} height={height} rx="14" fill="rgba(6,28,26,0.96)" stroke="rgba(0,229,168,0.35)" />
+      <text x={x + 14} y={y + 25} fill="#F5FFF9" fontSize="13" fontWeight="800">
+        {point.companyName}
+      </text>
+      <text x={x + 14} y={y + 48} fill="#A9C8BF" fontSize="12" fontWeight="700">
+        T: {point.transformationStrength} | R: {point.recognitionScore} | Gap: {formatGap(point.recognitionGap)}
+      </text>
+      <text x={x + 14} y={y + 71} fill="#00E5A8" fontSize="12" fontWeight="800">
+        {point.quadrant}
+      </text>
+    </g>
+  );
+}
+
+function SidePanel({
+  point,
+  isComparison
+}: {
+  point: MatrixPoint;
+  isComparison: boolean;
+}) {
+  const info = quadrantCopy[point.quadrant];
+
+  return (
+    <aside className="rounded-2xl border border-white/10 bg-white/[0.055] p-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-mint">
+        {isComparison ? "Selected Quadrant" : "Current Quadrant"}
+      </p>
+      <h3 className="mt-3 text-3xl font-semibold text-foreground">{point.quadrant}</h3>
+
+      <div className="mt-5 rounded-xl border border-white/10 bg-[#061c1a]/54 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+          Company
+        </p>
+        <p className="mt-2 text-lg font-semibold text-foreground">{point.companyName}</p>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.045] p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">Why</p>
+        <p className="mt-2 text-sm leading-6 text-muted">
+          Transformation Strength is{" "}
+          <span className="font-semibold text-foreground">{point.transformationStrength}</span>{" "}
+          and Recognition Score is{" "}
+          <span className="font-semibold text-foreground">{point.recognitionScore}</span>.
+        </p>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-mint/20 bg-mint/10 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mint">
+          Meaning
+        </p>
+        <p className="mt-2 text-sm leading-6 text-foreground">{info.meaning}</p>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.045] p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+          Decision
+        </p>
+        <p className="mt-2 text-base font-semibold text-foreground">{point.investorDecision}</p>
+        <p className="mt-1 text-xs text-mint">{info.implication}</p>
+      </div>
+    </aside>
+  );
+}
+
+function MatrixCalculationDetails({ points }: { points: MatrixPoint[] }) {
+  return (
+    <details className="mt-5 rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+      <summary className="cursor-pointer text-sm font-semibold text-mint">
+        How matrix placement is calculated
+      </summary>
+      <div className="mt-4 grid gap-4 text-sm leading-6 text-muted lg:grid-cols-[0.85fr_1.15fr]">
+        <div className="rounded-xl border border-white/10 bg-[#061c1a]/54 p-4">
+          <p className="font-semibold text-foreground">Placement formula</p>
+          <p className="mt-2">
+            Horizontal position uses Recognition Score from 0 to 100. Vertical
+            position uses Transformation Strength from 0 to 100, with higher
+            transformation plotted higher on the chart.
+          </p>
+          <p className="mt-3">
+            The matrix midpoint is 50 on each axis. This is a visual split for
+            comparing high versus low scores, not a company-specific rule.
+          </p>
+        </div>
+
+        <div className="grid gap-3">
+          {points.map((point) => (
+            <div
+              key={`calc-${point.id}`}
+              className="rounded-xl border border-white/10 bg-white/[0.04] p-3"
+            >
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="font-semibold text-foreground">{point.companyName}</p>
+                <span className="w-fit rounded-full border border-mint/20 bg-mint/10 px-2.5 py-1 text-xs font-semibold text-mint">
+                  {point.quadrant}
+                </span>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-muted">
+                Transformation {point.transformationStrength}{" "}
+                {point.transformationStrength >= transformationThreshold ? ">=" : "<"}{" "}
+                {transformationThreshold}; Recognition {point.recognitionScore}{" "}
+                {point.recognitionScore >= recognitionThreshold ? ">=" : "<"}{" "}
+                {recognitionThreshold}. Therefore: {point.quadrant}.
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function shortName(name: string) {
+  const cleaned = name
+    .replace("Group Holdings", "")
+    .replace("Industries", "")
+    .replace("International", "")
+    .replace("Investment", "")
+    .replace("Ltd", "")
+    .trim();
+
+  return cleaned.length > 12 ? `${cleaned.slice(0, 11)}...` : cleaned;
 }
 
 function decisionFromClassification(classification: string) {
@@ -399,209 +580,14 @@ function decisionFromClassification(classification: string) {
   return "Avoid for Now";
 }
 
-function clamp(value: number, min = 0, max = 100) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function getPointPosition(point: MatrixPoint, index: number) {
-  const offset = offsets[index % offsets.length];
-
-  const x = plot.x + (clamp(point.recognitionScore) / 100) * plot.w + offset.x;
-  const y =
-    plot.y + ((100 - clamp(point.transformationStrength)) / 100) * plot.h + offset.y;
-
-  return {
-    x: Math.max(plot.x + 34, Math.min(plot.x + plot.w - 130, x)),
-    y: Math.max(plot.y + 34, Math.min(plot.y + plot.h - 44, y)),
-  };
-}
-
-function getMomentumQuadrant(
-  transformationStrength: number,
-  recognitionScore: number
-): Quadrant {
-  if (transformationStrength >= axisMid && recognitionScore < axisMid) {
-    return "Hidden Winners";
-  }
-  if (transformationStrength >= axisMid && recognitionScore >= axisMid) {
-    return "Future Leaders";
-  }
-  if (transformationStrength < axisMid && recognitionScore >= axisMid) {
-    return "Overrated Leaders";
-  }
-  return "Value Traps";
-}
-
-function getQuadrantInfo(quadrant: Quadrant) {
-  if (quadrant === "Hidden Winners") {
-    return {
-      meaning: "High transformation, low recognition.",
-      implication: "Act Early candidate — transformation is ahead of recognition.",
-    };
-  }
-
-  if (quadrant === "Future Leaders") {
-    return {
-      meaning: "High transformation, high recognition.",
-      implication: "Quality ESG leader — monitor valuation and execution.",
-    };
-  }
-
-  if (quadrant === "Overrated Leaders") {
-    return {
-      meaning: "Low transformation, high recognition.",
-      implication: "Already recognised or crowded — be cautious.",
-    };
-  }
-
-  return {
-    meaning: "Low transformation, low recognition.",
-    implication: "Weak signal — avoid until evidence improves.",
-  };
-}
-
-function shortName(name: string) {
-  return name
-    .replace("Group Holdings", "")
-    .replace("Industries", "")
-    .replace("International", "")
-    .replace("Investment", "")
-    .replace("Ltd", "")
-    .trim();
-}
-
 function formatGap(gap: number) {
   return gap > 0 ? `+${gap}` : `${gap}`;
 }
 
-function QuadrantBadge({
-  x,
-  y,
-  label,
-  tone = "mint",
-}: {
-  x: number;
-  y: number;
-  label: string;
-  tone?: "mint" | "cyan" | "gold" | "rose";
-}) {
-  const style = {
-    mint: ["rgba(0,229,168,0.18)", "rgba(0,229,168,0.38)", "#9fffe5"],
-    cyan: ["rgba(34,211,238,0.18)", "rgba(34,211,238,0.38)", "#a5f3fc"],
-    gold: ["rgba(246,200,95,0.18)", "rgba(246,200,95,0.38)", "#f6c85f"],
-    rose: ["rgba(251,113,133,0.18)", "rgba(251,113,133,0.38)", "#fb7185"],
-  }[tone];
-
-  const width = Math.max(150, label.length * 9);
-
-  return (
-    <g>
-      <rect
-        x={x}
-        y={y - 25}
-        width={width}
-        height="34"
-        rx="17"
-        fill={style[0]}
-        stroke={style[1]}
-      />
-      <text
-        x={x + width / 2}
-        y={y - 3}
-        textAnchor="middle"
-        fill={style[2]}
-        fontSize="14"
-        fontWeight="900"
-      >
-        {label}
-      </text>
-    </g>
-  );
+function clamp(value: number) {
+  return clampNumber(value, 0, 100);
 }
 
-function CurrentPointPanel({ point }: { point: MatrixPoint }) {
-  const quadrant = getMomentumQuadrant(
-    point.transformationStrength,
-    point.recognitionScore
-  );
-  const info = getQuadrantInfo(quadrant);
-
-  return (
-    <>
-      <p className="text-xs font-black uppercase tracking-[0.32em] text-[#00e5a8]">
-        Current quadrant
-      </p>
-      <h3 className="mt-4 text-3xl font-black text-[#f5fff9]">{quadrant}</h3>
-      <p className="mt-4 text-sm leading-6 text-[#a9c8bf]">{info.meaning}</p>
-
-      <div className="mt-6 rounded-2xl border border-[#00e5a8]/25 bg-[#00e5a8]/10 p-4">
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-[#00e5a8]">
-          Investor implication
-        </p>
-        <p className="mt-2 font-bold leading-6 text-[#f5fff9]">
-          {info.implication}
-        </p>
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4">
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-[#a9c8bf]">
-          Company
-        </p>
-        <p className="mt-3 text-lg font-black text-[#f5fff9]">{point.companyName}</p>
-
-        <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-[#a9c8bf]">
-          <p>
-            T:{" "}
-            <span className="font-black text-[#f5fff9]">
-              {point.transformationStrength}
-            </span>
-          </p>
-          <p>
-            R:{" "}
-            <span className="font-black text-[#f5fff9]">
-              {point.recognitionScore}
-            </span>
-          </p>
-          <p>
-            Gap:{" "}
-            <span className="font-black text-[#f5fff9]">
-              {formatGap(point.recognitionGap)}
-            </span>
-          </p>
-          <p>
-            <span className="font-black text-[#f5fff9]">
-              {point.investorDecision}
-            </span>
-          </p>
-        </div>
-
-        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] p-3 text-xs leading-5 text-[#a9c8bf]">
-          Rule used: T {point.transformationStrength}{" "}
-          {point.transformationStrength >= axisMid ? "≥" : "<"} 50 and R{" "}
-          {point.recognitionScore} {point.recognitionScore >= axisMid ? "≥" : "<"}{" "}
-          50 → <span className="font-bold text-[#f5fff9]">{quadrant}</span>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function SideCard({
-  label,
-  title,
-  detail,
-}: {
-  label: string;
-  title: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
-      <p className="text-xs font-black uppercase tracking-[0.26em] text-[#00e5a8]">
-        {label}
-      </p>
-      <p className="mt-3 text-lg font-black text-[#f5fff9]">{title}</p>
-      <p className="mt-1 text-sm font-semibold text-[#a9c8bf]">{detail}</p>
-    </div>
-  );
+function clampNumber(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
 }
